@@ -1,18 +1,18 @@
 export default {
   // Use ts-jest preset for TypeScript support
   preset: 'ts-jest/presets/default-esm',
-  
+
   // Enable ES modules
   extensionsToTreatAsEsm: ['.ts'],
-  
+
   // Node environment for testing
   testEnvironment: 'node',
-  
-  // Module name mapping for TypeScript ES module imports  
+
+  // Module name mapping for TypeScript ES module imports
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
-  
+
   // Transform configuration for TypeScript with ES modules
   transform: {
     '^.+\\.tsx?$': [
@@ -27,14 +27,13 @@ export default {
       }
     ]
   },
-  
+
   // Test file patterns
   testMatch: [
-    '<rootDir>/src/**/__tests__/**/*.test.ts',
-    '<rootDir>/src/**/*.test.ts',
-    '<rootDir>/src/**/*.spec.ts'
+    '<rootDir>/tests/**/*.test.ts',
+    '<rootDir>/tests/**/*.spec.ts'
   ],
-  
+
   // Files to collect coverage from
   collectCoverageFrom: [
     'src/**/*.ts',
@@ -44,7 +43,7 @@ export default {
     '!src/**/*.spec.ts',
     '!src/index.ts' // Skip entry point for now
   ],
-  
+
   // Coverage thresholds
   coverageThreshold: {
     global: {
@@ -54,7 +53,7 @@ export default {
       statements: 80
     }
   },
-  
+
   // Coverage reporters
   coverageReporters: [
     'text',
@@ -62,27 +61,27 @@ export default {
     'html',
     'lcov'
   ],
-  
+
   // Setup files
   setupFilesAfterEnv: [
-    '<rootDir>/src/__tests__/setup.ts'
+    '<rootDir>/tests/setup.ts'
   ],
-  
+
   // Module directories
   moduleDirectories: ['node_modules', '<rootDir>/src'],
-  
+
   // Automatically clear mock calls and instances between every test
   clearMocks: true,
-  
+
   // Automatically restore mock state between every test
   restoreMocks: true,
-  
+
   // Display test results with more detail
   verbose: true,
-  
+
   // Global test timeout
   testTimeout: 10000,
-  
+
   // Transform ignore patterns - don't transform node_modules except MCP SDK if needed
   transformIgnorePatterns: [
     'node_modules/(?!(@modelcontextprotocol/sdk)/)'
