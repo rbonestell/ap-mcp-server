@@ -17,6 +17,9 @@
 		"format:check": "prettier --check .",
 		"format:fix": "prettier --write . && eslint --fix ."
 	},
+	"lint-staged": {
+		"*": "npm run format:fix"
+	},
 	"keywords": [
 		"mcp",
 		"model-context-protocol",
@@ -43,6 +46,7 @@
 		"jest": "^30.1.1",
 		"@types/jest": "^30.0.0",
 		"ts-jest": "^29.4.1",
+		"lint-staged": "^16.1.5",
 		"typescript": "^5.9.2",
 		"prettier": "^3.6.2"
 	},
