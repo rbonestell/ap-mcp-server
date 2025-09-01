@@ -352,6 +352,115 @@ describe('MonitoringService', () => {
     });
   });
 
+  describe('getMonitorStatus', () => {
+    test('should get monitor status with default options', async () => {
+      const monitorId = 'test-monitor';
+      mockHttpClient.get.mockResolvedValueOnce({ data: mockMonitors, status: 200, statusText: 'OK', headers: {} });
+      
+      const result = await monitoringService.getMonitorStatus(monitorId);
+      
+      expect(mockHttpClient.get).toHaveBeenCalledWith(
+        `account/monitors/${encodeURIComponent(monitorId)}/status`,
+        {}
+      );
+      expect(result).toEqual(mockMonitors);
+    });
+
+    test('should get monitor status with options', async () => {
+      const monitorId = 'test-monitor';
+      const options = { show_detail: true, agentid: 'agent-123' };
+      mockHttpClient.get.mockResolvedValueOnce({ data: mockMonitors, status: 200, statusText: 'OK', headers: {} });
+      
+      const result = await monitoringService.getMonitorStatus(monitorId, options);
+      
+      expect(mockHttpClient.get).toHaveBeenCalledWith(
+        `account/monitors/${encodeURIComponent(monitorId)}/status`,
+        options
+      );
+      expect(result).toEqual(mockMonitors);
+    });
+
+    test('should validate monitor ID', async () => {
+      await expect(monitoringService.getMonitorStatus(''))
+        .rejects.toThrow(APValidationError);
+    });
+
+    test('should validate status parameters', async () => {
+      await expect(monitoringService.getMonitorStatus('test', { show_detail: 'invalid' as any }))
+        .rejects.toThrow(APValidationError);
+    });
+  });
+
+  describe('getMonitorHistory', () => {
+    test('should get monitor history with default options', async () => {
+      const monitorId = 'test-monitor';
+      mockHttpClient.get.mockResolvedValueOnce({ data: mockMonitors, status: 200, statusText: 'OK', headers: {} });
+      
+      const result = await monitoringService.getMonitorHistory(monitorId);
+      
+      expect(mockHttpClient.get).toHaveBeenCalledWith(
+        `account/monitors/${encodeURIComponent(monitorId)}/history`,
+        {}
+      );
+      expect(result).toEqual(mockMonitors);
+    });
+
+    test('should get monitor history with all options', async () => {
+      const monitorId = 'test-monitor';
+      const options = {
+        show_detail: true,
+        agentid: 'agent-123',
+        min_date: '2024-01-01',
+        max_date: '2024-01-31',
+        page: '1',
+        page_size: 25
+      };
+      mockHttpClient.get.mockResolvedValueOnce({ data: mockMonitors, status: 200, statusText: 'OK', headers: {} });
+      
+      const result = await monitoringService.getMonitorHistory(monitorId, options);
+      
+      expect(mockHttpClient.get).toHaveBeenCalledWith(
+        `account/monitors/${encodeURIComponent(monitorId)}/history`,
+        options
+      );
+      expect(result).toEqual(mockMonitors);
+    });
+
+    test('should validate monitor ID', async () => {
+      await expect(monitoringService.getMonitorHistory(''))
+        .rejects.toThrow(APValidationError);
+    });
+
+    test('should validate history parameters', async () => {
+      await expect(monitoringService.getMonitorHistory('test', { page_size: 0 }))
+        .rejects.toThrow(APValidationError);
+      
+      await expect(monitoringService.getMonitorHistory('test', { page_size: 101 }))
+        .rejects.toThrow(APValidationError);
+      
+      await expect(monitoringService.getMonitorHistory('test', { show_detail: 'invalid' as any }))
+        .rejects.toThrow(APValidationError);
+      
+      await expect(monitoringService.getMonitorHistory('test', { page: 123 as any }))
+        .rejects.toThrow(APValidationError);
+    });
+
+    test('should validate date range', async () => {
+      await expect(monitoringService.getMonitorHistory('test', { 
+        min_date: '2024-01-31',
+        max_date: '2024-01-01'
+      }))
+        .rejects.toThrow(APValidationError);
+    });
+
+    test('should handle invalid dates', async () => {
+      await expect(monitoringService.getMonitorHistory('test', { 
+        min_date: 'invalid-date'
+      }))
+        .rejects.toThrow(APValidationError);
+    });
+  });
+
   describe('Monitor validation', () => {
     describe('name validation', () => {
       test('should validate monitor name is required', async () => {

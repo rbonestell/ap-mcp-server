@@ -605,4 +605,620 @@ describe('ContentService', () => {
       expect(thrownError.message).toContain('ContentService.getContentItem failed');
     });
   });
+
+  /**
+   * Phase 2: Enhanced Query Intelligence Tests
+   */
+  describe('Enhanced Query Intelligence - Phase 2', () => {
+    describe('optimizeSearchQuery', () => {
+      test('should optimize natural language query with NLP patterns', async () => {
+        const params = {
+          natural_query: 'photos of breaking news today',
+          suggest_filters: true,
+          optimize_for: 'relevance' as const
+        };
+
+        const result = await contentService.optimizeSearchQuery(params);
+
+        expect(result).toMatchObject({
+          optimized_query: expect.stringMatching(/breaking/),
+          original_query: 'photos of breaking news today',
+          transformations_applied: expect.objectContaining({
+            temporal_filters: expect.arrayContaining(['today']),
+            content_type_filters: expect.arrayContaining(['pictures'])
+          }),
+          confidence_score: expect.any(Number)
+        });
+
+        // Verify transformations were applied
+        expect(result.optimized_query).toMatch(/firstcreated:\[now-1d TO \*\]/); // Today filter
+        expect(result.optimized_query).toMatch(/type:picture/); // Photo filter
+
+        expect(result.confidence_score).toBeGreaterThan(0.2);
+        expect(result.confidence_score).toBeLessThanOrEqual(0.95);
+      });
+
+      test('should apply content preferences to query optimization', async () => {
+        const params = {
+          natural_query: 'sports updates', // Use "updates" instead of "news" to avoid NLP conflicts
+          content_preferences: {
+            preferred_types: ['picture' as const, 'video' as const],
+            preferred_subjects: ['basketball', 'football'],
+            preferred_locations: ['New York'],
+            recency_preference: 'recent' as const
+          }
+        };
+
+        const result = await contentService.optimizeSearchQuery(params);
+
+        expect(result.optimized_query).toMatch(/sports/); // Base query should contain sports
+        expect(result.optimized_query).toMatch(/(type:picture OR type:video)/);
+        expect(result.optimized_query).toMatch(/(subject\.name:"basketball" OR subject\.name:"football")/);
+        expect(result.optimized_query).toMatch(/place\.name:"New York"/);
+        expect(result.optimized_query).toMatch(/firstcreated:\[now-7d TO \*\]/);
+      });
+
+      test('should generate suggestions when requested', async () => {
+        const params = {
+          natural_query: 'news',
+          suggest_filters: true
+        };
+
+        const result = await contentService.optimizeSearchQuery(params);
+
+        expect(result.suggestions).toBeDefined();
+        expect(result.suggestions?.search_tips).toBeInstanceOf(Array);
+        expect(result.suggestions?.search_tips?.length).toBeGreaterThan(0);
+      });
+
+      test('should not generate suggestions when disabled', async () => {
+        const params = {
+          natural_query: 'technology updates',
+          suggest_filters: false
+        };
+
+        const result = await contentService.optimizeSearchQuery(params);
+
+        expect(result.suggestions).toBeUndefined();
+      });
+
+      test('should validate required natural_query parameter', async () => {
+        await expect(contentService.optimizeSearchQuery({ natural_query: '' }))
+          .rejects.toThrow(APValidationError);
+
+        await expect(contentService.optimizeSearchQuery({ natural_query: '   ' }))
+          .rejects.toThrow(APValidationError);
+
+        await expect(contentService.optimizeSearchQuery({} as any))
+          .rejects.toThrow(APValidationError);
+      });
+
+      test('should validate natural_query length', async () => {
+        const longQuery = 'a'.repeat(501);
+        
+        await expect(contentService.optimizeSearchQuery({ natural_query: longQuery }))
+          .rejects.toThrow(APValidationError);
+      });
+
+      test('should validate optimize_for parameter', async () => {
+        await expect(contentService.optimizeSearchQuery({ 
+          natural_query: 'test',
+          optimize_for: 'invalid' as any
+        })).rejects.toThrow(APValidationError);
+      });
+
+      test('should handle various NLP patterns', async () => {
+        const testCases = [
+          {
+            query: 'videos from yesterday',
+            expectedPatterns: { temporal: ['yesterday'], contentType: ['videos'] }
+          },
+          {
+            query: 'breaking news in Washington this week',
+            expectedPatterns: { temporal: ['this week'], location: ['Washington'] }
+          },
+          {
+            query: 'photos from last 3 days',
+            expectedPatterns: { temporal: ['last 3 days'], contentType: ['pictures'] }
+          }
+        ];
+
+        for (const testCase of testCases) {
+          const result = await contentService.optimizeSearchQuery({
+            natural_query: testCase.query
+          });
+
+          if (testCase.expectedPatterns.temporal) {
+            expect(result.transformations_applied.temporal_filters?.length).toBeGreaterThan(0);
+          }
+          if (testCase.expectedPatterns.contentType) {
+            expect(result.transformations_applied.content_type_filters?.length).toBeGreaterThan(0);
+          }
+          if (testCase.expectedPatterns.location) {
+            expect(result.transformations_applied.location_filters?.length).toBeGreaterThan(0);
+          }
+        }
+      });
+    });
+
+    describe('analyzeContentTrends', () => {
+      beforeEach(() => {
+        // Mock search response for trending analysis
+        const mockTrendingSearchResponse = {
+          data: {
+            total_items: 100,
+            items: [
+              {
+                item: {
+                  altids: { itemid: '1' },
+                  uri: 'tag:ap.org:2024:1',
+                  subject: [
+                    { name: 'Politics', code: 'POL001' },
+                    { name: 'Elections', code: 'ELE001' }
+                  ],
+                  place: [{ name: 'Washington' }],
+                  firstcreated: new Date().toISOString()
+                }
+              },
+              {
+                item: {
+                  altids: { itemid: '2' },
+                  uri: 'tag:ap.org:2024:2',
+                  subject: [
+                    { name: 'Technology', code: 'TECH001' }
+                  ],
+                  place: [{ name: 'California' }],
+                  firstcreated: new Date().toISOString()
+                }
+              },
+              {
+                item: {
+                  altids: { itemid: '3' },
+                  uri: 'tag:ap.org:2024:3',
+                  subject: [
+                    { name: 'Politics', code: 'POL001' }
+                  ],
+                  place: [{ name: 'New York' }],
+                  firstcreated: new Date().toISOString()
+                }
+              }
+            ]
+          }
+        };
+
+        mockHttpClient.get.mockResolvedValue({ 
+          data: mockTrendingSearchResponse, 
+          status: 200, 
+          statusText: 'OK', 
+          headers: {} 
+        });
+      });
+
+      test('should analyze content trends with default parameters', async () => {
+        const result = await contentService.analyzeContentTrends();
+
+        expect(result).toMatchObject({
+          timeframe: 'day',
+          analysis_period: expect.objectContaining({
+            start: expect.any(String),
+            end: expect.any(String)
+          }),
+          trending_topics: expect.any(Array),
+          total_content_analyzed: expect.any(Number),
+          content_types_analyzed: expect.arrayContaining(['text', 'picture', 'video', 'audio', 'graphic']),
+          metrics: expect.objectContaining({
+            top_rising_topics: expect.any(Array),
+            most_frequent_topics: expect.any(Array)
+          })
+        });
+
+        expect(result.trending_topics.length).toBeGreaterThan(0);
+        expect(result.trending_topics[0]).toMatchObject({
+          subject_name: expect.any(String),
+          frequency: expect.any(Number),
+          trend_direction: expect.stringMatching(/^(rising|stable|declining)$/),
+          trend_strength: expect.any(Number),
+          sample_content_ids: expect.any(Array)
+        });
+      });
+
+      test('should analyze trends for specific timeframe', async () => {
+        const params = {
+          timeframe: 'week' as const,
+          max_topics: 5,
+          include_metrics: true
+        };
+
+        const result = await contentService.analyzeContentTrends(params);
+
+        expect(result.timeframe).toBe('week');
+        expect(result.trending_topics.length).toBeLessThanOrEqual(5);
+        
+        // Check that the time range is approximately one week
+        const startTime = new Date(result.analysis_period.start).getTime();
+        const endTime = new Date(result.analysis_period.end).getTime();
+        const weekInMs = 7 * 24 * 60 * 60 * 1000;
+        const timeDiff = endTime - startTime;
+        
+        expect(timeDiff).toBeGreaterThan(weekInMs * 0.9); // Allow some variance
+        expect(timeDiff).toBeLessThan(weekInMs * 1.1);
+      });
+
+      test('should filter by content types', async () => {
+        const params = {
+          content_types: ['text' as const, 'picture' as const],
+          max_topics: 10
+        };
+
+        const result = await contentService.analyzeContentTrends(params);
+
+        expect(mockHttpClient.get).toHaveBeenCalledWith('content/search', expect.objectContaining({
+          q: expect.stringContaining('(type:text OR type:picture)')
+        }));
+      });
+
+      test('should apply location and subject filters', async () => {
+        const params = {
+          location_filter: 'California',
+          subject_filter: 'Technology'
+        };
+
+        const result = await contentService.analyzeContentTrends(params);
+
+        expect(mockHttpClient.get).toHaveBeenCalledWith('content/search', expect.objectContaining({
+          q: expect.stringMatching(/place\.name:"California".*subject\.name:"Technology"|subject\.name:"Technology".*place\.name:"California"/)
+        }));
+      });
+
+      test('should validate timeframe parameter', async () => {
+        await expect(contentService.analyzeContentTrends({ timeframe: 'invalid' as any }))
+          .rejects.toThrow(APValidationError);
+      });
+
+      test('should validate max_topics bounds', async () => {
+        await expect(contentService.analyzeContentTrends({ max_topics: 0 }))
+          .rejects.toThrow(APValidationError);
+
+        await expect(contentService.analyzeContentTrends({ max_topics: 51 }))
+          .rejects.toThrow(APValidationError);
+      });
+
+      test('should validate content_types parameter', async () => {
+        await expect(contentService.analyzeContentTrends({ content_types: ['invalid'] as any }))
+          .rejects.toThrow(APValidationError);
+      });
+
+      test('should handle search errors gracefully', async () => {
+        mockHttpClient.get.mockRejectedValueOnce(new APAPIError('Search failed', 'SEARCH_ERROR', 500));
+
+        await expect(contentService.analyzeContentTrends())
+          .rejects.toThrow(APError);
+      });
+    });
+
+    describe('getContentRecommendations', () => {
+      beforeEach(() => {
+        // Mock search response for recommendations
+        const mockRecommendationSearchResponse = {
+          data: {
+            total_items: 50,
+            items: [
+              {
+                item: {
+                  altids: { itemid: 'rec1' },
+                  uri: 'tag:ap.org:2024:rec1',
+                  headline: 'Recommended Article 1',
+                  title: 'Tech Innovation',
+                  type: 'text',
+                  firstcreated: new Date().toISOString(),
+                  urgency: 3,
+                  subject: [
+                    { name: 'Technology', code: 'TECH001' },
+                    { name: 'Innovation', code: 'INN001' }
+                  ],
+                  place: [{ name: 'California' }]
+                }
+              },
+              {
+                item: {
+                  altids: { itemid: 'rec2' },
+                  uri: 'tag:ap.org:2024:rec2',
+                  headline: 'Recommended Article 2',
+                  title: 'Sports Update',
+                  type: 'picture',
+                  firstcreated: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+                  urgency: 2,
+                  subject: [
+                    { name: 'Sports', code: 'SPORT001' }
+                  ],
+                  place: [{ name: 'New York' }]
+                }
+              }
+            ]
+          }
+        };
+
+        mockHttpClient.get.mockResolvedValue({
+          data: mockRecommendationSearchResponse,
+          status: 200,
+          statusText: 'OK',
+          headers: {}
+        });
+      });
+
+      test('should get content recommendations with default parameters', async () => {
+        const result = await contentService.getContentRecommendations();
+
+        expect(result).toMatchObject({
+          recommendations: expect.any(Array),
+          total_recommendations: expect.any(Number),
+          search_strategy: expect.any(String),
+          filters_applied: expect.any(Array)
+        });
+
+        if (result.recommendations.length > 0) {
+          expect(result.recommendations[0]).toMatchObject({
+            content_id: expect.any(String),
+            content_summary: expect.objectContaining({
+              title: expect.any(String),
+              type: expect.any(String)
+            }),
+            relevance_score: expect.any(Number),
+            recommendation_reason: expect.any(String),
+            related_subjects: expect.any(Array),
+            similarity_factors: expect.any(Object)
+          });
+        }
+      });
+
+      test('should get recommendations based on seed content', async () => {
+        // First mock the getContentItem calls for seed analysis
+        const mockSeedContent = {
+          data: {
+            item: {
+              altids: { itemid: 'seed1' },
+              uri: 'tag:ap.org:2024:seed1',
+              type: 'text',
+              subject: [
+                { name: 'Technology', code: 'TECH001' },
+                { name: 'AI', code: 'AI001' }
+              ],
+              place: [{ name: 'Silicon Valley' }]
+            }
+          }
+        };
+
+        mockHttpClient.get
+          .mockResolvedValueOnce({ data: mockSeedContent, status: 200, statusText: 'OK', headers: {} })
+          .mockResolvedValueOnce({
+            data: {
+              data: {
+                total_items: 25,
+                items: [
+                  {
+                    item: {
+                      altids: { itemid: 'related1' },
+                      uri: 'tag:ap.org:2024:related1',
+                      headline: 'AI Development News',
+                      type: 'text',
+                      firstcreated: new Date().toISOString(),
+                      subject: [{ name: 'Technology', code: 'TECH001' }, { name: 'AI', code: 'AI001' }],
+                      place: [{ name: 'Silicon Valley' }]
+                    }
+                  }
+                ]
+              }
+            },
+            status: 200,
+            statusText: 'OK',
+            headers: {}
+          });
+
+        const params = {
+          seed_content: ['seed1'],
+          max_recommendations: 5
+        };
+
+        const result = await contentService.getContentRecommendations(params);
+
+        expect(result.seed_analysis).toBeDefined();
+        expect(result.seed_analysis?.common_subjects).toContain('Technology');
+        expect(result.seed_analysis?.common_subjects).toContain('AI');
+        expect(result.seed_analysis?.common_locations).toContain('Silicon Valley');
+      });
+
+      test('should filter recommendations by content type and subjects', async () => {
+        const params = {
+          subjects: ['Technology', 'Science'],
+          content_types: ['text' as const, 'video' as const],
+          max_recommendations: 10
+        };
+
+        const result = await contentService.getContentRecommendations(params);
+
+        expect(mockHttpClient.get).toHaveBeenCalledWith('content/search', expect.objectContaining({
+          q: expect.stringMatching(/(subject\.name:"Technology" OR subject\.name:"Science").*\(type:text OR type:video\)|\(type:text OR type:video\).*\(subject\.name:"Technology" OR subject\.name:"Science"\)/)
+        }));
+      });
+
+      test('should apply recency preference', async () => {
+        const params = {
+          recency_preference: 'latest' as const
+        };
+
+        const result = await contentService.getContentRecommendations(params);
+
+        expect(mockHttpClient.get).toHaveBeenCalledWith('content/search', expect.objectContaining({
+          q: expect.stringContaining('firstcreated:[now-1d TO *]')
+        }));
+      });
+
+      test('should exclude specified content', async () => {
+        // Mock recommendations that include the excluded content
+        const mockSearchWithExcluded = {
+          data: {
+            total_items: 3,
+            items: [
+              {
+                item: {
+                  altids: { itemid: 'exclude-me' },
+                  uri: 'tag:ap.org:2024:exclude-me',
+                  headline: 'Should be excluded',
+                  type: 'text',
+                  firstcreated: new Date().toISOString(),
+                  subject: [{ name: 'Technology', code: 'TECH001' }]
+                }
+              },
+              {
+                item: {
+                  altids: { itemid: 'keep-me' },
+                  uri: 'tag:ap.org:2024:keep-me',
+                  headline: 'Should be included',
+                  type: 'text',
+                  firstcreated: new Date().toISOString(),
+                  subject: [{ name: 'Technology', code: 'TECH001' }]
+                }
+              }
+            ]
+          }
+        };
+
+        mockHttpClient.get.mockResolvedValueOnce({
+          data: mockSearchWithExcluded,
+          status: 200,
+          statusText: 'OK',
+          headers: {}
+        });
+
+        const params = {
+          subjects: ['Technology'],
+          exclude_seen: ['exclude-me']
+        };
+
+        const result = await contentService.getContentRecommendations(params);
+
+        const excludedIds = result.recommendations.map(rec => rec.content_id);
+        expect(excludedIds).not.toContain('exclude-me');
+        if (result.recommendations.length > 0) {
+          expect(excludedIds).toContain('keep-me');
+        }
+      });
+
+      test('should respect similarity threshold', async () => {
+        const params = {
+          similarity_threshold: 0.8, // Very high threshold
+          subjects: ['Technology']
+        };
+
+        const result = await contentService.getContentRecommendations(params);
+
+        // With a high threshold, we might get fewer or no recommendations
+        for (const recommendation of result.recommendations) {
+          expect(recommendation.relevance_score).toBeGreaterThanOrEqual(0.8);
+        }
+      });
+
+      test('should validate max_recommendations bounds', async () => {
+        await expect(contentService.getContentRecommendations({ max_recommendations: 0 }))
+          .rejects.toThrow(APValidationError);
+
+        await expect(contentService.getContentRecommendations({ max_recommendations: 26 }))
+          .rejects.toThrow(APValidationError);
+      });
+
+      test('should validate similarity_threshold bounds', async () => {
+        await expect(contentService.getContentRecommendations({ similarity_threshold: -0.1 }))
+          .rejects.toThrow(APValidationError);
+
+        await expect(contentService.getContentRecommendations({ similarity_threshold: 1.1 }))
+          .rejects.toThrow(APValidationError);
+      });
+
+      test('should validate content_types parameter', async () => {
+        await expect(contentService.getContentRecommendations({ content_types: ['invalid'] as any }))
+          .rejects.toThrow(APValidationError);
+      });
+
+      test('should validate recency_preference parameter', async () => {
+        await expect(contentService.getContentRecommendations({ recency_preference: 'invalid' as any }))
+          .rejects.toThrow(APValidationError);
+      });
+
+      test('should handle seed content analysis errors gracefully', async () => {
+        // Mock getContentItem to fail for seed content
+        mockHttpClient.get.mockRejectedValueOnce(new APAPIError('Content not found', 'NOT_FOUND', 404));
+
+        const params = {
+          seed_content: ['nonexistent'],
+          subjects: ['Technology']
+        };
+
+        // Should continue with recommendations even if seed analysis fails
+        mockHttpClient.get.mockResolvedValueOnce({
+          data: { data: { total_items: 0, items: [] } },
+          status: 200,
+          statusText: 'OK',
+          headers: {}
+        });
+
+        const result = await contentService.getContentRecommendations(params);
+
+        expect(result).toBeDefined();
+        expect(result.search_strategy).toContain('with specified subjects');
+      });
+
+      test('should sort recommendations by relevance score', async () => {
+        // Mock response with items that will have different relevance scores
+        const mockDiverseItems = {
+          data: {
+            total_items: 3,
+            items: [
+              {
+                item: {
+                  altids: { itemid: 'low-relevance' },
+                  uri: 'tag:ap.org:2024:low-relevance',
+                  headline: 'Unrelated content',
+                  type: 'text',
+                  firstcreated: new Date(Date.now() - 86400000 * 30).toISOString(), // 30 days ago
+                  urgency: 1,
+                  subject: [{ name: 'Unrelated', code: 'UNREL001' }]
+                }
+              },
+              {
+                item: {
+                  altids: { itemid: 'high-relevance' },
+                  uri: 'tag:ap.org:2024:high-relevance',
+                  headline: 'Highly relevant content',
+                  type: 'text',
+                  firstcreated: new Date().toISOString(), // Now
+                  urgency: 4,
+                  subject: [{ name: 'Technology', code: 'TECH001' }]
+                }
+              }
+            ]
+          }
+        };
+
+        mockHttpClient.get.mockResolvedValueOnce({
+          data: mockDiverseItems,
+          status: 200,
+          statusText: 'OK',
+          headers: {}
+        });
+
+        const params = {
+          subjects: ['Technology'],
+          similarity_threshold: 0.1 // Low threshold to include both items
+        };
+
+        const result = await contentService.getContentRecommendations(params);
+
+        if (result.recommendations.length >= 2) {
+          // Should be sorted by relevance score descending
+          expect(result.recommendations[0].relevance_score)
+            .toBeGreaterThanOrEqual(result.recommendations[1].relevance_score);
+        }
+      });
+    });
+  });
 });

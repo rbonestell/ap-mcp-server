@@ -8,6 +8,14 @@ import {
   FeedParams,
   ItemParams,
   RSSParams,
+  OptimizeQueryParams,
+  OptimizeQueryResponse,
+  ContentTrendsParams,
+  ContentTrendsResponse,
+  ContentRecommendationsParams,
+  ContentRecommendationsResponse,
+  TrendingTopic,
+  ContentRecommendation,
 } from '../types/api.types.js';
 import { APValidationError, APError } from '../errors/APError.js';
 
@@ -318,5 +326,799 @@ export class ContentService {
       urgency: item.urgency,
       subjects: item.subject?.map((s: any) => s.name) || [],
     };
+  }
+
+  /**
+   * Phase 2: Enhanced Query Intelligence Methods
+   */
+
+  /**
+   * Optimize a natural language search query for AP content API
+   * @param params Natural language query optimization parameters
+   * @returns Optimized query with suggestions and transformations
+   */
+  async optimizeSearchQuery(params: OptimizeQueryParams): Promise<OptimizeQueryResponse> {
+    this.validateOptimizeQueryParams(params);
+
+    try {
+      // Apply NLP patterns to transform natural language to structured query
+      const nlpResult = this.applyNLPPatterns(params.natural_query);
+      
+      // Apply content preferences if provided (but avoid duplicating filters already applied by NLP)
+      const preferenceFilters = this.applyContentPreferences(params.content_preferences, nlpResult);
+      
+      // Combine base query with NLP transformations and preferences
+      const queryParts = [
+        nlpResult.baseQuery,
+        ...nlpResult.appliedFilters,
+        ...preferenceFilters
+      ].filter(Boolean);
+
+      // Optimize for specific criteria
+      const optimizedParts = this.optimizeQueryForCriteria(queryParts, params.optimize_for || 'relevance');
+      
+      const optimizedQuery = optimizedParts.join(' AND ');
+      
+      // Generate suggestions if requested
+      const suggestions = params.suggest_filters !== false 
+        ? this.generateQuerySuggestions(params.natural_query, nlpResult)
+        : undefined;
+
+      // Calculate confidence score based on transformations applied
+      const confidenceScore = this.calculateQueryConfidence(nlpResult, preferenceFilters.length);
+
+      return {
+        optimized_query: optimizedQuery,
+        original_query: params.natural_query,
+        transformations_applied: {
+          temporal_filters: nlpResult.temporalFilters,
+          content_type_filters: nlpResult.contentTypeFilters,
+          location_filters: nlpResult.locationFilters,
+          subject_filters: nlpResult.subjectFilters,
+          other_filters: nlpResult.otherFilters,
+        },
+        suggestions,
+        confidence_score: confidenceScore,
+      };
+    } catch (error) {
+      throw this.handleServiceError('optimizeSearchQuery', error, params);
+    }
+  }
+
+  /**
+   * Analyze content trends across different timeframes
+   * @param params Content trend analysis parameters
+   * @returns Trending topics and analysis metrics
+   */
+  async analyzeContentTrends(params: ContentTrendsParams = {}): Promise<ContentTrendsResponse> {
+    this.validateContentTrendsParams(params);
+
+    try {
+      const timeframe = params.timeframe || 'day';
+      const maxTopics = Math.min(params.max_topics || 10, 50);
+      
+      // Calculate time range for analysis
+      const timeRange = this.calculateTimeRange(timeframe);
+      
+      // Build search query for trending analysis
+      const searchQuery = this.buildTrendingSearchQuery(params, timeRange);
+      
+      // Perform multiple searches to gather trend data
+      const trendingData = await this.gatherTrendingData(
+        searchQuery, 
+        params.content_types,
+        maxTopics
+      );
+
+      // Analyze trends and calculate metrics
+      const analyzedTrends = this.analyzeTrendingTopics(trendingData, timeframe);
+      
+      // Extract geographic distribution if location data available
+      const geoDistribution = this.extractGeographicTrends(trendingData);
+      
+      return {
+        timeframe,
+        analysis_period: {
+          start: timeRange.start,
+          end: timeRange.end,
+        },
+        trending_topics: analyzedTrends.slice(0, maxTopics),
+        total_content_analyzed: trendingData.totalCount,
+        content_types_analyzed: params.content_types || ['text', 'picture', 'video', 'audio', 'graphic'],
+        metrics: {
+          top_rising_topics: analyzedTrends
+            .filter(t => t.trend_direction === 'rising')
+            .slice(0, 5)
+            .map(t => t.subject_name),
+          most_frequent_topics: analyzedTrends
+            .sort((a, b) => b.frequency - a.frequency)
+            .slice(0, 5)
+            .map(t => t.subject_name),
+          geographic_hotspots: geoDistribution.slice(0, 3),
+        },
+      };
+    } catch (error) {
+      throw this.handleServiceError('analyzeContentTrends', error, params);
+    }
+  }
+
+  /**
+   * Get content recommendations based on criteria
+   * @param params Content recommendation parameters
+   * @returns Recommended content with relevance scores
+   */
+  async getContentRecommendations(params: ContentRecommendationsParams = {}): Promise<ContentRecommendationsResponse> {
+    this.validateContentRecommendationsParams(params);
+
+    try {
+      const maxRecommendations = Math.min(params.max_recommendations || 10, 25);
+      const similarityThreshold = params.similarity_threshold || 0.3;
+
+      // Analyze seed content if provided
+      let seedAnalysis;
+      if (params.seed_content && params.seed_content.length > 0) {
+        seedAnalysis = await this.analyzeSeedContent(params.seed_content);
+      }
+
+      // Build recommendation search strategy
+      const searchStrategy = this.buildRecommendationStrategy(params, seedAnalysis);
+      
+      // Execute multiple targeted searches
+      const candidateContent = await this.searchForRecommendations(searchStrategy, params);
+      
+      // Score and rank recommendations
+      const scoredRecommendations = this.scoreContentRecommendations(
+        candidateContent,
+        params,
+        seedAnalysis,
+        similarityThreshold
+      );
+      
+      // Filter out excluded content
+      const filteredRecommendations = this.filterExcludedContent(
+        scoredRecommendations,
+        params.exclude_seen || []
+      );
+
+      // Sort by relevance score and limit results
+      const topRecommendations = filteredRecommendations
+        .sort((a, b) => b.relevance_score - a.relevance_score)
+        .slice(0, maxRecommendations);
+
+      return {
+        recommendations: topRecommendations,
+        seed_analysis: seedAnalysis,
+        total_recommendations: topRecommendations.length,
+        search_strategy: searchStrategy.description,
+        filters_applied: searchStrategy.filtersApplied,
+      };
+    } catch (error) {
+      throw this.handleServiceError('getContentRecommendations', error, params);
+    }
+  }
+
+  /**
+   * Private helper methods for enhanced query intelligence
+   */
+
+  private validateOptimizeQueryParams(params: OptimizeQueryParams): void {
+    if (!params.natural_query || typeof params.natural_query !== 'string' || params.natural_query.trim().length === 0) {
+      throw new APValidationError('Natural query is required and must be a non-empty string', 'natural_query', { natural_query: params.natural_query });
+    }
+
+    if (params.natural_query.length > 500) {
+      throw new APValidationError('Natural query must be 500 characters or less', 'natural_query', { length: params.natural_query.length });
+    }
+
+    if (params.optimize_for && !['relevance', 'recency', 'popularity'].includes(params.optimize_for)) {
+      throw new APValidationError('optimize_for must be one of: relevance, recency, popularity', 'optimize_for', { optimize_for: params.optimize_for });
+    }
+  }
+
+  private validateContentTrendsParams(params: ContentTrendsParams): void {
+    if (params.timeframe && !['hour', 'day', 'week'].includes(params.timeframe)) {
+      throw new APValidationError('timeframe must be one of: hour, day, week', 'timeframe', { timeframe: params.timeframe });
+    }
+
+    if (params.max_topics !== undefined && (params.max_topics < 1 || params.max_topics > 50)) {
+      throw new APValidationError('max_topics must be between 1 and 50', 'max_topics', { max_topics: params.max_topics });
+    }
+
+    if (params.content_types) {
+      const validTypes = ['text', 'picture', 'graphic', 'audio', 'video'];
+      const invalidTypes = params.content_types.filter(type => !validTypes.includes(type));
+      if (invalidTypes.length > 0) {
+        throw new APValidationError(`Invalid content types: ${invalidTypes.join(', ')}`, 'content_types', { invalid_types: invalidTypes });
+      }
+    }
+  }
+
+  private validateContentRecommendationsParams(params: ContentRecommendationsParams): void {
+    if (params.max_recommendations !== undefined && (params.max_recommendations < 1 || params.max_recommendations > 25)) {
+      throw new APValidationError('max_recommendations must be between 1 and 25', 'max_recommendations', { max_recommendations: params.max_recommendations });
+    }
+
+    if (params.similarity_threshold !== undefined && (params.similarity_threshold < 0 || params.similarity_threshold > 1)) {
+      throw new APValidationError('similarity_threshold must be between 0 and 1', 'similarity_threshold', { similarity_threshold: params.similarity_threshold });
+    }
+
+    if (params.content_types) {
+      const validTypes = ['text', 'picture', 'graphic', 'audio', 'video'];
+      const invalidTypes = params.content_types.filter(type => !validTypes.includes(type));
+      if (invalidTypes.length > 0) {
+        throw new APValidationError(`Invalid content types: ${invalidTypes.join(', ')}`, 'content_types', { invalid_types: invalidTypes });
+      }
+    }
+
+    if (params.recency_preference && !['latest', 'recent', 'any'].includes(params.recency_preference)) {
+      throw new APValidationError('recency_preference must be one of: latest, recent, any', 'recency_preference', { recency_preference: params.recency_preference });
+    }
+  }
+
+  private applyNLPPatterns(query: string): {
+    baseQuery: string;
+    appliedFilters: string[];
+    temporalFilters: string[];
+    contentTypeFilters: string[];
+    locationFilters: string[];
+    subjectFilters: string[];
+    otherFilters: string[];
+  } {
+    let processedQuery = query;
+    const appliedFilters: string[] = [];
+    const temporalFilters: string[] = [];
+    const contentTypeFilters: string[] = [];
+    const locationFilters: string[] = [];
+    const subjectFilters: string[] = [];
+    const otherFilters: string[] = [];
+
+    // Temporal patterns
+    const temporalPatterns = [
+      { pattern: /\b(today|now)\b/gi, transform: 'firstcreated:[now-1d TO *]', description: 'today' },
+      { pattern: /\b(yesterday)\b/gi, transform: 'firstcreated:[now-2d TO now-1d]', description: 'yesterday' },
+      { pattern: /\b(this week|recent|recently|latest)\b/gi, transform: 'firstcreated:[now-7d TO *]', description: 'this week' },
+      { pattern: /\b(this month)\b/gi, transform: 'firstcreated:[now-30d TO *]', description: 'this month' },
+      { pattern: /\b(last (\d+) days?)\b/gi, transform: (match: string, full: string, days: string) => `firstcreated:[now-${days}d TO *]`, description: 'last N days' }
+    ];
+
+    // Content type patterns
+    const contentTypePatterns = [
+      { pattern: /\b(photo|photos|picture|pictures|image|images)\b/gi, transform: 'type:picture', description: 'pictures' },
+      { pattern: /\b(video|videos|footage)\b/gi, transform: 'type:video', description: 'videos' },
+      { pattern: /\b(audio|sound|sounds)\b/gi, transform: 'type:audio', description: 'audio' },
+      { pattern: /\b(graphic|graphics|chart|charts)\b/gi, transform: 'type:graphic', description: 'graphics' },
+      { pattern: /\b(text|article|articles|story|stories|news)\b/gi, transform: 'type:text', description: 'text' }
+    ];
+
+    // Location patterns (basic - looks for "in [Location]" pattern)
+    const locationPatterns = [
+      { pattern: /\bin ([A-Z][a-zA-Z\s]+?)(?:\s|$|,|\.|\?|!)/g, transform: (match: string, location: string) => `place.name:"${location.trim()}"`, description: 'location filter' }
+    ];
+
+    // Apply temporal patterns
+    for (const pattern of temporalPatterns) {
+      if (typeof pattern.transform === 'string') {
+        if (pattern.pattern.test(processedQuery)) {
+          appliedFilters.push(pattern.transform);
+          temporalFilters.push(pattern.description);
+          processedQuery = processedQuery.replace(pattern.pattern, ' ').trim();
+        }
+      } else {
+        const matches = processedQuery.match(pattern.pattern);
+        if (matches) {
+          for (const match of matches) {
+            const fullMatch = match;
+            const daysMatch = fullMatch.match(/\d+/);
+            if (daysMatch) {
+              const filter = `firstcreated:[now-${daysMatch[0]}d TO *]`;
+              appliedFilters.push(filter);
+              temporalFilters.push(`last ${daysMatch[0]} days`);
+            }
+          }
+          processedQuery = processedQuery.replace(pattern.pattern, ' ').trim();
+        }
+      }
+    }
+
+    // Apply content type patterns
+    for (const pattern of contentTypePatterns) {
+      if (pattern.pattern.test(processedQuery)) {
+        appliedFilters.push(pattern.transform);
+        contentTypeFilters.push(pattern.description);
+        processedQuery = processedQuery.replace(pattern.pattern, ' ').trim();
+      }
+    }
+
+    // Apply location patterns
+    for (const pattern of locationPatterns) {
+      const matches = Array.from(processedQuery.matchAll(pattern.pattern));
+      if (matches.length > 0) {
+        for (const match of matches) {
+          if (match[1]) {
+            const location = match[1].trim();
+            const filter = `place.name:"${location}"`;
+            appliedFilters.push(filter);
+            locationFilters.push(location);
+          }
+        }
+        processedQuery = processedQuery.replace(pattern.pattern, ' ').trim();
+      }
+    }
+
+    // Clean up the processed query
+    const baseQuery = processedQuery.replace(/\s+/g, ' ').trim();
+
+    return {
+      baseQuery,
+      appliedFilters,
+      temporalFilters,
+      contentTypeFilters,
+      locationFilters,
+      subjectFilters,
+      otherFilters,
+    };
+  }
+
+  private applyContentPreferences(preferences?: OptimizeQueryParams['content_preferences'], nlpResult?: any): string[] {
+    if (!preferences) return [];
+
+    const filters: string[] = [];
+
+    // Only add type filters if NLP didn't already detect content types
+    if (preferences.preferred_types && preferences.preferred_types.length > 0 && 
+        (!nlpResult || nlpResult.contentTypeFilters.length === 0)) {
+      if (preferences.preferred_types.length === 1) {
+        filters.push(`type:${preferences.preferred_types[0]}`);
+      } else {
+        const typeQuery = preferences.preferred_types.map(type => `type:${type}`).join(' OR ');
+        filters.push(`(${typeQuery})`);
+      }
+    }
+
+    if (preferences.preferred_subjects && preferences.preferred_subjects.length > 0) {
+      const subjectQuery = preferences.preferred_subjects.map(subject => `subject.name:"${subject}"`).join(' OR ');
+      filters.push(`(${subjectQuery})`);
+    }
+
+    if (preferences.preferred_locations && preferences.preferred_locations.length > 0 &&
+        (!nlpResult || nlpResult.locationFilters.length === 0)) {
+      const locationQuery = preferences.preferred_locations.map(location => `place.name:"${location}"`).join(' OR ');
+      filters.push(`(${locationQuery})`);
+    }
+
+    // Only add temporal filters if NLP didn't already detect time references
+    if (preferences.recency_preference && preferences.recency_preference !== 'any' &&
+        (!nlpResult || nlpResult.temporalFilters.length === 0)) {
+      switch (preferences.recency_preference) {
+        case 'latest':
+          filters.push('firstcreated:[now-1d TO *]');
+          break;
+        case 'recent':
+          filters.push('firstcreated:[now-7d TO *]');
+          break;
+      }
+    }
+
+    return filters;
+  }
+
+  private optimizeQueryForCriteria(queryParts: string[], optimizeFor: 'relevance' | 'recency' | 'popularity'): string[] {
+    // For now, return as-is, but this could be enhanced with:
+    // - Relevance: boost important terms, add related subject filters
+    // - Recency: adjust temporal filters, add sort parameters
+    // - Popularity: add urgency filters, boost high-profile subjects
+    return queryParts;
+  }
+
+  private generateQuerySuggestions(originalQuery: string, nlpResult: any): OptimizeQueryResponse['suggestions'] {
+    const suggestions: OptimizeQueryResponse['suggestions'] = {
+      additional_filters: [],
+      alternative_queries: [],
+      search_tips: [],
+    };
+
+    // Suggest additional filters based on query content
+    if (!nlpResult.temporalFilters.length) {
+      suggestions.additional_filters?.push('Add time filter like "today" or "this week"');
+    }
+
+    if (!nlpResult.contentTypeFilters.length) {
+      suggestions.additional_filters?.push('Specify content type like "photos" or "videos"');
+    }
+
+    // Suggest alternative query approaches
+    if (originalQuery.length < 10) {
+      suggestions.alternative_queries?.push('Try adding more specific keywords or context');
+    }
+
+    // Add helpful search tips
+    suggestions.search_tips?.push('Use quotes for exact phrases: "breaking news"');
+    suggestions.search_tips?.push('Use location keywords like "in Washington" for geographic filtering');
+    suggestions.search_tips?.push('Add time references like "today" or "this week" for recent content');
+
+    return suggestions;
+  }
+
+  private calculateQueryConfidence(nlpResult: any, preferenceCount: number): number {
+    let confidence = 0.5; // Base confidence
+
+    // Boost confidence for successful transformations
+    if (nlpResult.temporalFilters.length > 0) confidence += 0.15;
+    if (nlpResult.contentTypeFilters.length > 0) confidence += 0.15;
+    if (nlpResult.locationFilters.length > 0) confidence += 0.1;
+    if (preferenceCount > 0) confidence += 0.1;
+
+    // Ensure confidence is within reasonable bounds
+    return Math.min(Math.max(confidence, 0.2), 0.95);
+  }
+
+  // Trend analysis helper methods
+  private calculateTimeRange(timeframe: 'hour' | 'day' | 'week'): { start: string; end: string } {
+    const now = new Date();
+    const end = now.toISOString();
+    let start: Date;
+
+    switch (timeframe) {
+      case 'hour':
+        start = new Date(now.getTime() - (60 * 60 * 1000));
+        break;
+      case 'day':
+        start = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+        break;
+      case 'week':
+        start = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+        break;
+    }
+
+    return {
+      start: start.toISOString(),
+      end,
+    };
+  }
+
+  private buildTrendingSearchQuery(params: ContentTrendsParams, timeRange: { start: string; end: string }): string {
+    const queryParts: string[] = [];
+
+    // Add time range
+    queryParts.push(`firstcreated:[${timeRange.start} TO ${timeRange.end}]`);
+
+    // Add content type filters if specified
+    if (params.content_types && params.content_types.length > 0) {
+      if (params.content_types.length === 1) {
+        queryParts.push(`type:${params.content_types[0]}`);
+      } else {
+        const typeQuery = params.content_types.map(type => `type:${type}`).join(' OR ');
+        queryParts.push(`(${typeQuery})`);
+      }
+    }
+
+    // Add location filter if specified
+    if (params.location_filter) {
+      queryParts.push(`place.name:"${params.location_filter}"`);
+    }
+
+    // Add subject filter if specified
+    if (params.subject_filter) {
+      queryParts.push(`subject.name:"${params.subject_filter}"`);
+    }
+
+    return queryParts.join(' AND ');
+  }
+
+  private async gatherTrendingData(searchQuery: string, contentTypes?: string[], maxTopics?: number): Promise<any> {
+    // Perform search to get trending data
+    const searchParams: SearchParams = {
+      q: searchQuery,
+      page_size: 100, // Get more items for better trend analysis
+      include: ['subject', 'place', 'urgency', 'firstcreated'],
+    };
+
+    const searchResponse = await this.searchContent(searchParams);
+    
+    // Extract subjects and their frequencies
+    const subjectCounts = new Map<string, { count: number; codes: Set<string>; content_ids: string[]; locations: Set<string> }>();
+    
+    for (const result of searchResponse.data.items) {
+      const item = result.item;
+      if (item.subject) {
+        for (const subject of item.subject) {
+          const key = subject.name;
+          if (!subjectCounts.has(key)) {
+            subjectCounts.set(key, {
+              count: 0,
+              codes: new Set(),
+              content_ids: [],
+              locations: new Set(),
+            });
+          }
+          
+          const subjectData = subjectCounts.get(key)!;
+          subjectData.count++;
+          subjectData.codes.add(subject.code);
+          subjectData.content_ids.push(item.altids?.itemid || item.uri);
+          
+          // Add location data if available
+          if (item.place) {
+            for (const place of item.place) {
+              subjectData.locations.add(place.name);
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      totalCount: searchResponse.data.total_items,
+      subjectCounts,
+      searchResponse,
+    };
+  }
+
+  private analyzeTrendingTopics(trendingData: any, timeframe: string): TrendingTopic[] {
+    const trends: TrendingTopic[] = [];
+    
+    for (const [subjectName, data] of trendingData.subjectCounts) {
+      // Simple trend analysis - in a real implementation, this would compare
+      // with historical data to determine trend direction
+      const trendDirection: 'rising' | 'stable' | 'declining' = 
+        data.count > 5 ? 'rising' : 
+        data.count > 2 ? 'stable' : 'declining';
+      
+      const trendStrength = Math.min(data.count / 10, 1.0); // Normalize to 0-1
+      
+      trends.push({
+        subject_name: subjectName,
+        subject_code: Array.from(data.codes)[0], // Use first code
+        frequency: data.count,
+        trend_direction: trendDirection,
+        trend_strength: trendStrength,
+        sample_content_ids: data.content_ids.slice(0, 3), // Up to 3 sample IDs
+        geographic_distribution: data.locations.size > 0 
+          ? Object.fromEntries(Array.from(data.locations).map(loc => [loc, 1]))
+          : undefined,
+      });
+    }
+    
+    // Sort by frequency descending
+    return trends.sort((a, b) => b.frequency - a.frequency);
+  }
+
+  private extractGeographicTrends(trendingData: any): string[] {
+    const locationCounts = new Map<string, number>();
+    
+    for (const [_, data] of trendingData.subjectCounts) {
+      for (const location of data.locations) {
+        locationCounts.set(location, (locationCounts.get(location) || 0) + 1);
+      }
+    }
+    
+    return Array.from(locationCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([location]) => location);
+  }
+
+  // Recommendation helper methods
+  private async analyzeSeedContent(contentIds: string[]): Promise<ContentRecommendationsResponse['seed_analysis']> {
+    const commonSubjects = new Set<string>();
+    const commonLocations = new Set<string>();
+    const contentTypes = new Map<string, number>();
+    
+    // Analyze each seed content item
+    for (const contentId of contentIds.slice(0, 5)) { // Limit to 5 for performance
+      try {
+        const content = await this.getContentItem(contentId);
+        const item = content.data.item;
+        
+        // Collect subjects
+        if (item.subject) {
+          for (const subject of item.subject) {
+            commonSubjects.add(subject.name);
+          }
+        }
+        
+        // Collect locations
+        if (item.place) {
+          for (const place of item.place) {
+            commonLocations.add(place.name);
+          }
+        }
+        
+        // Count content types
+        contentTypes.set(item.type, (contentTypes.get(item.type) || 0) + 1);
+      } catch (error) {
+        // Skip failed content items
+        continue;
+      }
+    }
+    
+    return {
+      common_subjects: Array.from(commonSubjects).slice(0, 10),
+      common_locations: Array.from(commonLocations).slice(0, 5),
+      content_type_distribution: Object.fromEntries(contentTypes),
+    };
+  }
+
+  private buildRecommendationStrategy(params: ContentRecommendationsParams, seedAnalysis?: any): { description: string; filtersApplied: string[] } {
+    const filters: string[] = [];
+    let description = 'Content recommendation';
+    
+    // Use seed analysis for recommendations
+    if (seedAnalysis) {
+      if (seedAnalysis.common_subjects.length > 0) {
+        description += ' based on similar subjects';
+        filters.push('subject-based similarity');
+      }
+      if (seedAnalysis.common_locations.length > 0) {
+        description += ' and locations';
+        filters.push('location-based similarity');
+      }
+    }
+    
+    // Apply explicit parameters
+    if (params.subjects && params.subjects.length > 0) {
+      description += ' with specified subjects';
+      filters.push('explicit subject filters');
+    }
+    
+    if (params.content_types && params.content_types.length > 0) {
+      description += ' filtered by content type';
+      filters.push('content type filters');
+    }
+    
+    if (params.location_preference) {
+      description += ' with location preference';
+      filters.push('location preference');
+    }
+    
+    if (params.recency_preference && params.recency_preference !== 'any') {
+      description += ` prioritizing ${params.recency_preference} content`;
+      filters.push('recency preference');
+    }
+    
+    return { description, filtersApplied: filters };
+  }
+
+  private async searchForRecommendations(strategy: any, params: ContentRecommendationsParams): Promise<any[]> {
+    const searchParams: SearchParams = {
+      page_size: 50, // Get more candidates for better scoring
+      include: ['subject', 'place', 'urgency', 'firstcreated'],
+    };
+    
+    const queryParts: string[] = [];
+    
+    // Add subject-based search if specified
+    if (params.subjects && params.subjects.length > 0) {
+      const subjectQuery = params.subjects.map(subject => `subject.name:"${subject}"`).join(' OR ');
+      queryParts.push(`(${subjectQuery})`);
+    }
+    
+    // Add content type filter
+    if (params.content_types && params.content_types.length > 0) {
+      if (params.content_types.length === 1) {
+        queryParts.push(`type:${params.content_types[0]}`);
+      } else {
+        const typeQuery = params.content_types.map(type => `type:${type}`).join(' OR ');
+        queryParts.push(`(${typeQuery})`);
+      }
+    }
+    
+    // Add location preference
+    if (params.location_preference) {
+      queryParts.push(`place.name:"${params.location_preference}"`);
+    }
+    
+    // Add recency filter
+    if (params.recency_preference) {
+      switch (params.recency_preference) {
+        case 'latest':
+          queryParts.push('firstcreated:[now-1d TO *]');
+          break;
+        case 'recent':
+          queryParts.push('firstcreated:[now-7d TO *]');
+          break;
+      }
+    }
+    
+    if (queryParts.length > 0) {
+      searchParams.q = queryParts.join(' AND ');
+    }
+    
+    const searchResponse = await this.searchContent(searchParams);
+    return searchResponse.data.items;
+  }
+
+  private scoreContentRecommendations(
+    candidates: any[], 
+    params: ContentRecommendationsParams, 
+    seedAnalysis?: any, 
+    threshold: number = 0.3
+  ): ContentRecommendation[] {
+    const recommendations: ContentRecommendation[] = [];
+    
+    for (const candidate of candidates) {
+      const item = candidate.item;
+      const contentSummary = ContentService.extractContentSummary(candidate);
+      
+      // Calculate relevance score based on multiple factors
+      let relevanceScore = 0;
+      const similarityFactors: ContentRecommendation['similarity_factors'] = {};
+      let recommendationReason = '';
+      
+      // Subject overlap scoring
+      if (seedAnalysis?.common_subjects) {
+        const itemSubjects = item.subject?.map((s: any) => s.name) || [];
+        const subjectOverlap = itemSubjects.filter((s: string) => seedAnalysis.common_subjects.includes(s)).length;
+        const subjectSimilarity = subjectOverlap / Math.max(seedAnalysis.common_subjects.length, 1);
+        similarityFactors.subject_overlap = subjectSimilarity;
+        relevanceScore += subjectSimilarity * 0.4;
+        if (subjectOverlap > 0) {
+          recommendationReason += `Shares ${subjectOverlap} subjects with seed content. `;
+        }
+      }
+      
+      // Location overlap scoring
+      if (seedAnalysis?.common_locations) {
+        const itemLocations = item.place?.map((p: any) => p.name) || [];
+        const locationOverlap = itemLocations.filter((l: string) => seedAnalysis.common_locations.includes(l)).length;
+        const locationSimilarity = locationOverlap / Math.max(seedAnalysis.common_locations.length, 1);
+        similarityFactors.location_overlap = locationSimilarity;
+        relevanceScore += locationSimilarity * 0.2;
+        if (locationOverlap > 0) {
+          recommendationReason += `Same location as seed content. `;
+        }
+      }
+      
+      // Content type matching
+      if (params.content_types) {
+        if (params.content_types.includes(item.type)) {
+          similarityFactors.content_type_match = 1;
+          relevanceScore += 0.2;
+          recommendationReason += `Matches preferred content type. `;
+        }
+      }
+      
+      // Temporal relevance (recency boost)
+      if (item.firstcreated) {
+        const contentDate = new Date(item.firstcreated);
+        const daysSinceCreated = (Date.now() - contentDate.getTime()) / (24 * 60 * 60 * 1000);
+        const temporalRelevance = Math.max(0, 1 - (daysSinceCreated / 30)); // Decay over 30 days
+        similarityFactors.temporal_relevance = temporalRelevance;
+        relevanceScore += temporalRelevance * 0.2;
+      }
+      
+      // Urgency boost
+      if (item.urgency && item.urgency >= 3) {
+        relevanceScore += 0.1;
+        recommendationReason += 'High urgency content. ';
+      }
+      
+      // Only include recommendations above threshold
+      if (relevanceScore >= threshold) {
+        recommendations.push({
+          content_id: item.altids?.itemid || item.uri,
+          content_summary: {
+            title: contentSummary.title,
+            headline: contentSummary.headline,
+            type: contentSummary.type,
+            publish_date: contentSummary.publishDate,
+            subjects: contentSummary.subjects,
+            locations: item.place?.map((p: any) => p.name) || [],
+          },
+          relevance_score: Math.round(relevanceScore * 1000) / 1000, // Round to 3 decimal places
+          recommendation_reason: recommendationReason.trim() || 'Content matches your criteria',
+          related_subjects: item.subject?.map((s: any) => s.name) || [],
+          similarity_factors: similarityFactors,
+        });
+      }
+    }
+    
+    return recommendations;
+  }
+
+  private filterExcludedContent(recommendations: ContentRecommendation[], excludeIds: string[]): ContentRecommendation[] {
+    if (excludeIds.length === 0) return recommendations;
+    
+    const excludeSet = new Set(excludeIds);
+    return recommendations.filter(rec => !excludeSet.has(rec.content_id));
   }
 }
