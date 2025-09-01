@@ -6,7 +6,7 @@
 <a href="https://app.codecov.io/gh/rbonestell/ap-mcp-server/"><img src="https://img.shields.io/codecov/c/github/rbonestell/ap-mcp-server?logo=codecov&logoColor=white" alt="Code Coverage"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
 
-A Model Context Protocol (MCP) server that provides access to the Associated Press Media API. This server allows MCP clients to search, retrieve, and interact with AP's comprehensive news content, account information, and monitoring capabilities.
+An _*unofficial*_ Model Context Protocol (MCP) server that provides access to the Associated Press Media API. This server allows MCP clients to search, retrieve, and interact with AP's comprehensive news content, account information, and monitoring capabilities.
 
 > [!NOTE]
 > For more info about the AP Media API, visit the AP [developer documentation](https://developer.ap.org/ap-media-api/).
