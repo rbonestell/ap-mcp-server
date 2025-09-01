@@ -32,7 +32,7 @@ export class APMCPServer {
 
     // Initialize HTTP client and services
     this.httpClient = new APHttpClient(this.config);
-    this.contentService = new ContentService(this.httpClient);
+    this.contentService = new ContentService(this.httpClient, this.config);
     this.accountService = new AccountService(this.httpClient);
     this.monitoringService = new MonitoringService(this.httpClient);
 

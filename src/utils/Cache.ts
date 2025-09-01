@@ -37,12 +37,18 @@ export class SimpleCache {
     maxSize?: number;
     defaultTTL?: number;
     cleanupInterval?: number;
+    autoCleanup?: boolean;
   } = {}) {
     this.maxSize = options.maxSize || 1000;
     this.defaultTTL = options.defaultTTL || 5 * 60 * 1000; // 5 minutes default
     this.cleanupInterval = options.cleanupInterval || 60 * 1000; // 1 minute cleanup
 
-    this.startCleanupTimer();
+    // Only start timer if autoCleanup is not explicitly false
+    // This allows for better control over resource management
+    if (options.autoCleanup !== false) {
+      // Don't start timer immediately - wait for first item
+      // This prevents timer from running on empty cache
+    }
   }
 
   /**
@@ -62,6 +68,9 @@ export class SimpleCache {
       expires: now + ttl,
       createdAt: now,
     });
+
+    // Start cleanup timer if this is the first item
+    this.manageCleanupTimer();
   }
 
   /**
@@ -116,6 +125,9 @@ export class SimpleCache {
     this.stats.hits = 0;
     this.stats.misses = 0;
     this.stats.evictions = 0;
+    
+    // Stop cleanup timer when cache is cleared
+    this.manageCleanupTimer();
   }
 
   /**
@@ -227,6 +239,9 @@ export class SimpleCache {
     for (const key of expiredKeys) {
       this.cache.delete(key);
     }
+
+    // Stop timer if cache is now empty after cleanup
+    this.manageCleanupTimer();
   }
 
   /**
@@ -249,6 +264,30 @@ export class SimpleCache {
     if (this.cleanupTimer) {
       clearInterval(this.cleanupTimer);
       this.cleanupTimer = null;
+    }
+  }
+
+  /**
+   * Clean up resources (call this before disposing of the cache instance)
+   * This method should be called when the cache is no longer needed
+   * to prevent memory leaks from the cleanup timer
+   */
+  destroy(): void {
+    this.stopCleanupTimer();
+    this.cache.clear();
+  }
+
+  /**
+   * Enable automatic start/stop of cleanup timer based on cache usage
+   * This prevents timers from running when cache is empty
+   */
+  private manageCleanupTimer(): void {
+    if (this.cache.size > 0 && !this.cleanupTimer) {
+      // Start timer if cache has items and timer is not running
+      this.startCleanupTimer();
+    } else if (this.cache.size === 0 && this.cleanupTimer) {
+      // Stop timer if cache is empty
+      this.stopCleanupTimer();
     }
   }
 }

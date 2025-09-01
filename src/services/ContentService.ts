@@ -1,5 +1,8 @@
 import { APAPIError, APError, APNetworkError, APValidationError } from '../errors/APError.js';
 import { APHttpClient } from '../http/APHttpClient.js';
+import { APConfigManager } from '../config/APConfig.js';
+import { ResponseFormatter } from '../utils/ResponseFormatter.js';
+import { QuerySuggestions } from '../types/responses.types.js';
 import {
 	BulkContentParams,
 	BulkContentResponse,
@@ -32,7 +35,67 @@ import { CacheTTL, globalCache, SimpleCache } from '../utils/Cache.js';
  * Service for AP Content API operations
  */
 export class ContentService {
-  constructor(private readonly httpClient: APHttpClient) {}
+  constructor(
+    private readonly httpClient: APHttpClient,
+    private readonly config?: APConfigManager
+  ) {}
+
+  /**
+   * Apply plan enforcement based on configuration
+   * @param params Any parameters object that may contain in_my_plan
+   * @returns Modified params with enforced plan setting
+   */
+  private enforceInMyPlan<T extends { in_my_plan?: boolean }>(params: T): T {
+    // If config is available and enforcePlan is true, force in_my_plan to true
+    if (this.config && this.config.get('enforcePlan')) {
+      return { ...params, in_my_plan: true };
+    }
+    return params;
+  }
+
+  /**
+   * Generate query suggestions for broad searches
+   * @param query The original search query
+   * @param totalItems Total number of items found
+   * @returns Query suggestions or undefined
+   */
+  private generateQuerySuggestions(query: string, totalItems: number): QuerySuggestions | undefined {
+    const suggestions: QuerySuggestions = {};
+
+    // Check if query is too broad
+    if (totalItems > 1000) {
+      suggestions.query_too_broad = true;
+      suggestions.suggested_refinements = [
+        `${query} AND firstcreated:[NOW-7DAYS TO NOW]`,
+        `${query} AND firstcreated:[NOW-24HOURS TO NOW]`,
+        `${query} AND type:text`,
+        `${query} AND type:picture`,
+        `${query} AND place.name:"United States"`,
+        `${query} AND urgency:5`
+      ];
+    }
+
+    // Add filter suggestions for broad queries
+    if (totalItems > 500) {
+      suggestions.filter_suggestions = {
+        date_range: 'firstcreated:[NOW-24HOURS TO NOW]',
+        content_type: 'type:text OR type:picture',
+        location: 'place.name:"United States" OR place.name:"Europe"'
+      };
+    }
+
+    // Add related queries based on query length
+    if (query.length < 30) {
+      suggestions.related_queries = [
+        `${query} breaking news`,
+        `${query} latest updates`,
+        `${query} analysis`,
+        `${query} exclusive`
+      ];
+    }
+
+    return Object.keys(suggestions).length > 0 ? suggestions : undefined;
+  }
 
   /**
    * Search for AP content
@@ -41,12 +104,28 @@ export class ContentService {
    */
   async searchContent(params: SearchParams = {}): Promise<SearchResponse> {
     this.validateSearchParams(params);
+    const enforcedParams = this.enforceInMyPlan(params);
 
     try {
-      const response = await this.httpClient.get<SearchResponse>('content/search', params);
-      return response.data;
+      const response = await this.httpClient.get<SearchResponse>('content/search', enforcedParams);
+      const searchData = response.data;
+      
+      // Add query suggestions if results indicate query is too broad
+      if (searchData.data && searchData.data.total_items > 1000 && params.q) {
+        const suggestions = this.generateQuerySuggestions(params.q, searchData.data.total_items);
+        if (suggestions) {
+          (searchData as any).suggestions = suggestions;
+        }
+      }
+      
+      // Add rate limit info to response if available
+      if (response.rateLimit) {
+        (searchData as any).rate_limit_info = response.rateLimit;
+      }
+      
+      return searchData;
     } catch (error) {
-      throw this.handleServiceError('searchContent', error, params);
+      throw this.handleServiceError('searchContent', error, enforcedParams);
     }
   }
 
@@ -62,12 +141,13 @@ export class ContentService {
     }
 
     this.validateItemParams(params);
+    const enforcedParams = this.enforceInMyPlan(params);
 
     try {
-      const response = await this.httpClient.get<ContentResponse>(`content/${encodeURIComponent(itemId)}`, params);
+      const response = await this.httpClient.get<ContentResponse>(`content/${encodeURIComponent(itemId)}`, enforcedParams);
       return response.data;
     } catch (error) {
-      throw this.handleServiceError('getContentItem', error, { itemId, ...params });
+      throw this.handleServiceError('getContentItem', error, { itemId, ...enforcedParams });
     }
   }
 
@@ -78,12 +158,13 @@ export class ContentService {
    */
   async getContentFeed(params: FeedParams = {}): Promise<FeedResponse> {
     this.validateFeedParams(params);
+    const enforcedParams = this.enforceInMyPlan(params);
 
     try {
-      const response = await this.httpClient.get<FeedResponse>('content/feed', params);
+      const response = await this.httpClient.get<FeedResponse>('content/feed', enforcedParams);
       return response.data;
     } catch (error) {
-      throw this.handleServiceError('getContentFeed', error, params);
+      throw this.handleServiceError('getContentFeed', error, enforcedParams);
     }
   }
 
@@ -489,7 +570,7 @@ export class ContentService {
 
       // Generate suggestions if requested
       const suggestions = params.suggest_filters !== false
-        ? this.generateQuerySuggestions(params.natural_query, nlpResult)
+        ? this.generateOptimizedQuerySuggestions(params.natural_query, nlpResult)
         : undefined;
 
       // Calculate confidence score based on transformations applied
@@ -838,7 +919,7 @@ export class ContentService {
     return queryParts;
   }
 
-  private generateQuerySuggestions(originalQuery: string, nlpResult: any): OptimizeQueryResponse['suggestions'] {
+  private generateOptimizedQuerySuggestions(originalQuery: string, nlpResult: any): OptimizeQueryResponse['suggestions'] {
     const suggestions: OptimizeQueryResponse['suggestions'] = {
       additional_filters: [],
       alternative_queries: [],

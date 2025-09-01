@@ -5,6 +5,9 @@ export class APError extends Error {
   public readonly code: string;
   public readonly statusCode: number | undefined;
   public readonly details: Record<string, any> | undefined;
+  public readonly suggested_action?: string;
+  public readonly can_retry?: boolean;
+  public readonly alternative_tool?: string;
 
   constructor(
     message: string,
@@ -18,10 +21,22 @@ export class APError extends Error {
     this.statusCode = statusCode;
     this.details = details;
 
+    // Set recovery hints based on error type
+    this.setRecoveryHints();
+
     // Maintain proper stack trace for where our error was thrown
     if ((Error as any).captureStackTrace) {
       (Error as any).captureStackTrace(this, APError);
     }
+  }
+
+  /**
+   * Set recovery hints based on error code and status
+   */
+  protected setRecoveryHints(): void {
+    // Default hints - subclasses override for specific guidance
+    this.can_retry = false;
+    this.suggested_action = 'Review error details and adjust request';
   }
 
   toJSON() {
@@ -31,6 +46,9 @@ export class APError extends Error {
       code: this.code,
       statusCode: this.statusCode,
       details: this.details,
+      suggested_action: this.suggested_action,
+      can_retry: this.can_retry,
+      alternative_tool: this.alternative_tool,
       stack: this.stack,
     };
   }
@@ -43,6 +61,12 @@ export class APConfigurationError extends APError {
   constructor(message: string, details?: Record<string, any>) {
     super(message, 'CONFIGURATION_ERROR', undefined, details);
     this.name = 'APConfigurationError';
+  }
+
+  protected setRecoveryHints(): void {
+    this.can_retry = false;
+    this.suggested_action = 'Check AP_API_KEY environment variable and other configuration settings';
+    this.alternative_tool = undefined;
   }
 }
 
@@ -62,6 +86,43 @@ export class APAPIError extends APError {
     super(message, code, statusCode, details);
     this.name = 'APAPIError';
     this.originalError = originalError;
+  }
+
+  protected setRecoveryHints(): void {
+    switch (this.statusCode) {
+      case 400:
+        this.can_retry = false;
+        this.suggested_action = 'Review request parameters and correct invalid values';
+        break;
+      case 401:
+        this.can_retry = false;
+        this.suggested_action = 'Verify API key is valid and properly configured';
+        break;
+      case 403:
+        this.can_retry = false;
+        this.suggested_action = 'Check if content is included in your AP plan';
+        this.alternative_tool = 'search_content with in_my_plan=true';
+        break;
+      case 404:
+        this.can_retry = false;
+        this.suggested_action = 'Verify item ID or try searching for content';
+        this.alternative_tool = 'search_content';
+        break;
+      case 429:
+        this.can_retry = true;
+        this.suggested_action = 'Wait for rate limit reset before retrying (check retry_after header)';
+        break;
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        this.can_retry = true;
+        this.suggested_action = 'AP service issue - retry after a short delay (30-60 seconds)';
+        break;
+      default:
+        this.can_retry = false;
+        this.suggested_action = 'Review API documentation for this error code';
+    }
   }
 
   static fromAPResponse(response: any, statusCode: number): APAPIError {
@@ -93,6 +154,19 @@ export class APNetworkError extends APError {
     this.name = 'APNetworkError';
     this.originalError = originalError;
   }
+
+  protected setRecoveryHints(): void {
+    this.can_retry = true;
+    
+    if (this.message.includes('timeout')) {
+      this.suggested_action = 'Request timed out - retry with longer timeout or smaller page_size';
+    } else if (this.message.includes('cancelled')) {
+      this.suggested_action = 'Request was cancelled - retry if needed';
+      this.can_retry = false;
+    } else {
+      this.suggested_action = 'Network issue - check connection and retry';
+    }
+  }
 }
 
 /**
@@ -106,6 +180,18 @@ export class APValidationError extends APError {
     });
     this.name = 'APValidationError';
   }
+
+  protected setRecoveryHints(): void {
+    this.can_retry = false;
+    this.suggested_action = `Fix validation error in field '${this.details?.field}' and retry`;
+    
+    // Provide specific hints based on field
+    if (this.details?.field === 'page_size') {
+      this.suggested_action = 'Adjust page_size to be between 1 and 100';
+    } else if (this.details?.field === 'item_ids') {
+      this.suggested_action = 'Ensure item_ids array has 1-50 valid IDs';
+    }
+  }
 }
 
 /**
@@ -115,6 +201,11 @@ export class APAuthenticationError extends APError {
   constructor(message: string = 'Authentication failed') {
     super(message, 'AUTHENTICATION_ERROR', 401);
     this.name = 'APAuthenticationError';
+  }
+
+  protected setRecoveryHints(): void {
+    this.can_retry = false;
+    this.suggested_action = 'Verify AP_API_KEY is valid and has not expired';
   }
 }
 
@@ -129,6 +220,15 @@ export class APRateLimitError extends APError {
     this.name = 'APRateLimitError';
     this.retryAfter = retryAfter;
   }
+
+  protected setRecoveryHints(): void {
+    this.can_retry = true;
+    if (this.retryAfter) {
+      this.suggested_action = `Rate limit exceeded - wait ${this.retryAfter} seconds before retrying`;
+    } else {
+      this.suggested_action = 'Rate limit exceeded - wait before retrying or reduce request frequency';
+    }
+  }
 }
 
 /**
@@ -138,6 +238,12 @@ export class APNotFoundError extends APError {
   constructor(message: string, resource?: string) {
     super(message, 'NOT_FOUND_ERROR', 404, { resource });
     this.name = 'APNotFoundError';
+  }
+
+  protected setRecoveryHints(): void {
+    this.can_retry = false;
+    this.suggested_action = `Resource '${this.details?.resource}' not found - verify ID or use search_content`;
+    this.alternative_tool = 'search_content';
   }
 }
 

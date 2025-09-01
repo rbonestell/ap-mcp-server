@@ -7,6 +7,8 @@
 
 import { APMCPServer } from './server/APMCPServer.js';
 import { APConfigurationError } from './errors/APError.js';
+import { globalCache } from './utils/Cache.js';
+import { globalRequestManager } from './utils/RequestManager.js';
 
 async function main() {
   try {
@@ -32,12 +34,24 @@ async function main() {
 // Handle process signals for graceful shutdown
 process.on('SIGINT', () => {
   console.error('Received SIGINT, shutting down gracefully...');
+  // Clean up resources to prevent memory leaks
+  globalRequestManager.cancelAll();
+  globalCache.destroy();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   console.error('Received SIGTERM, shutting down gracefully...');
+  // Clean up resources to prevent memory leaks
+  globalRequestManager.cancelAll();
+  globalCache.destroy();
   process.exit(0);
+});
+
+// Clean up on process exit
+process.on('beforeExit', () => {
+  globalRequestManager.destroy();
+  globalCache.destroy();
 });
 
 // Start the server

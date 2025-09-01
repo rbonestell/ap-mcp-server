@@ -5,6 +5,7 @@
 <a href="https://github.com/rbonestell/ap-mcp-server/actions/workflows/test.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/rbonestell/ap-mcp-server/test.yml?branch=main&logo=jest&logoColor=white&label=tests" alt="Test Results"></a>
 <a href="https://app.codecov.io/gh/rbonestell/ap-mcp-server/"><img src="https://img.shields.io/codecov/c/github/rbonestell/ap-mcp-server?logo=codecov&logoColor=white" alt="Code Coverage"></a>
 <img src="https://img.shields.io/badge/tools-26-brightgreen.svg?logo=modelcontextprotocol" alt="26 Available Tools">
+<a href="https://www.anthropic.com/claude-code"><img src="https://img.shields.io/badge/made_with-claude_code-da7756.svg?logo=claude&logoColor=white" alt="Made with Claude Code"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
 
 An _**unofficial**_ Model Context Protocol (MCP) server that transforms the Associated Press Media API into an **AI-optimized content intelligence resource**. With 26 powerful tools, this MCP server enables conversational AI applications to seamlessly access, analyze, and interact with AP's comprehensive news content through natural language interfaces.
@@ -22,6 +23,10 @@ An _**unofficial**_ Model Context Protocol (MCP) server that transforms the Asso
 - **Intelligent Content Recommendations**: AI-powered content discovery and related article suggestions
 - **Trend Analysis**: Real-time trending topic detection and analysis
 - **Smart Query Optimization**: Automatic query enhancement for better search results
+- **Plan Enforcement**: Automatic content filtering to authorized plan items (configurable via `AP_ENFORCE_PLAN`)
+- **AI Error Recovery**: Self-healing error hints with suggested actions and retry guidance
+- **Rate Limit Intelligence**: Automatic rate limit detection and backoff with retry hints
+- **Query Suggestions**: Intelligent query refinement suggestions for broad searches
 
 ### 📈 Performance & Scale
 
@@ -144,18 +149,19 @@ AI tools automatically convert these requests into the appropriate MCP tool call
 
 ### Environment Variables
 
-| Variable              | Required | Default                      | Description                           |
-| --------------------- | -------- | ---------------------------- | ------------------------------------- |
-| `AP_API_KEY`          | ✅       | -                            | Your AP API key                       |
-| `AP_BASE_URL`         | ❌       | `https://api.ap.org/media/v` | AP API base URL                       |
-| `AP_TIMEOUT`          | ❌       | `30000`                      | Request timeout (ms)                  |
-| `AP_RETRIES`          | ❌       | `3`                          | Retry attempts for failed requests    |
-| `AP_DEBUG`            | ❌       | `false`                      | Enable debug logging                  |
-| `AP_LOG_LEVEL`        | ❌       | `info`                       | Log level (error, warn, info, debug)  |
-| `AP_VERBOSE_LOGGING`  | ❌       | `false`                      | Enable request/response logging       |
-| `AP_CACHE_ENABLED`    | ❌       | `true`                       | Enable intelligent caching system     |
-| `AP_CACHE_TTL_TRENDS` | ❌       | `300000`                     | Trending topics cache TTL (5 minutes) |
-| `AP_CACHE_TTL_SEARCH` | ❌       | `180000`                     | Search results cache TTL (3 minutes)  |
+| Variable              | Required | Default                      | Description                                                          |
+| --------------------- | -------- | ---------------------------- | -------------------------------------------------------------------- |
+| `AP_API_KEY`          | ✅       | -                            | Your AP API key                                                      |
+| `AP_BASE_URL`         | 🚫       | `https://api.ap.org/media/v` | AP API base URL                                                      |
+| `AP_TIMEOUT`          | 🚫       | `30000`                      | Request timeout (ms)                                                 |
+| `AP_RETRIES`          | 🚫       | `3`                          | Retry attempts for failed requests                                   |
+| `AP_ENFORCE_PLAN`     | 🚫       | `true`                       | Enforce in_my_plan=true for all content requests (AI safety feature) |
+| `AP_DEBUG`            | 🚫       | `false`                      | Enable debug logging                                                 |
+| `AP_LOG_LEVEL`        | 🚫       | `info`                       | Log level (error, warn, info, debug)                                 |
+| `AP_VERBOSE_LOGGING`  | 🚫       | `false`                      | Enable request/response logging                                      |
+| `AP_CACHE_ENABLED`    | 🚫       | `true`                       | Enable intelligent caching system                                    |
+| `AP_CACHE_TTL_TRENDS` | 🚫       | `300000`                     | Trending topics cache TTL (5 minutes)                                |
+| `AP_CACHE_TTL_SEARCH` | 🚫       | `180000`                     | Search results cache TTL (3 minutes)                                 |
 
 ## 🛠️ Available Tools (26 Total)
 
@@ -453,6 +459,21 @@ This MCP server provides **complete coverage** of the AP Media API with intellig
 - **Cache Hit Rate**: ~85% for trending topics and frequent searches
 - **Concurrent Requests**: Optimized for high-throughput applications
 
+### My Plan Enforcement
+
+The MCP server includes automatic plan enforcement to prevent AI agents from accessing content outside their authorized AP plan. This is enabled by default for safety.
+
+**Configuration:**
+
+- Set `AP_ENFORCE_PLAN=true` (default) to enforce plan restrictions on all content requests
+- Set `AP_ENFORCE_PLAN=false` to allow unrestricted content access (use with caution)
+
+When enabled, all relevant content requests automatically include `in_my_plan=true`, ensuring AI agents only access authorized content. This prevents:
+
+- Accidental access to premium content not in your plan
+- Unexpected API costs from out-of-plan content
+- Compliance issues with content licensing
+
 ## 💡 AI Usage Patterns
 
 ### Bulk Operations Workflow
@@ -511,13 +532,14 @@ AP_CACHE_TTL_SEARCH=180000    # 3 minutes in milliseconds
 
 ### Error Handling
 
-The server implements comprehensive error handling:
+The server implements comprehensive AI-friendly error handling:
 
-- **APAPIError**: AP API-specific errors with status codes
-- **APConfigurationError**: Configuration and setup errors
-- **APNetworkError**: Network and connectivity issues
-- **Rate Limiting**: Automatic retry with exponential backoff
-- **Validation**: Input validation with clear error messages
+- **APAPIError**: AP API-specific errors with status codes and recovery hints
+- **APConfigurationError**: Configuration and setup errors with corrective actions
+- **APNetworkError**: Network and connectivity issues with retry guidance
+- **Rate Limiting**: Automatic retry with exponential backoff and retry-after hints
+- **Validation**: Input validation with clear error messages and suggestions
+- **AI Recovery Hints**: All errors include `suggested_action`, `can_retry`, and `alternative_tool` properties for self-healing AI behavior
 
 ### Testing
 
