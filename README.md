@@ -2,6 +2,9 @@
 
 A Model Context Protocol (MCP) server that provides access to the Associated Press Media API. This server allows MCP clients to search, retrieve, and interact with AP's comprehensive news content, account information, and monitoring capabilities.
 
+> [!NOTE]
+> For more info about the AP Media API, visit the AP [developer documentation](https://developer.ap.org/ap-media-api/).
+
 ## Features
 
 - **Content Operations**: Search content, get specific items, access live feeds, RSS feeds
@@ -22,16 +25,19 @@ A Model Context Protocol (MCP) server that provides access to the Associated Pre
 
 1. Clone or download this repository
 2. Install dependencies:
+
    ```bash
    npm install
    ```
 
 3. Copy the environment template:
+
    ```bash
    cp .env.example .env
    ```
 
 4. Add your AP API key to `.env`:
+
    ```bash
    AP_API_KEY=your_actual_api_key_here
    ```
@@ -46,14 +52,14 @@ A Model Context Protocol (MCP) server that provides access to the Associated Pre
 
 ### Environment Variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `AP_API_KEY` | ✅ | - | Your AP API key |
-| `AP_BASE_URL` | ❌ | `https://api.ap.org/media/v` | AP API base URL |
-| `AP_TIMEOUT` | ❌ | `30000` | Request timeout (ms) |
-| `AP_RETRIES` | ❌ | `3` | Retry attempts for failed requests |
-| `AP_DEBUG` | ❌ | `false` | Enable debug logging |
-| `AP_LOG_LEVEL` | ❌ | `info` | Log level (error, warn, info, debug) |
+| Variable       | Required | Default                      | Description                          |
+| -------------- | -------- | ---------------------------- | ------------------------------------ |
+| `AP_API_KEY`   | ✅       | -                            | Your AP API key                      |
+| `AP_BASE_URL`  | ❌       | `https://api.ap.org/media/v` | AP API base URL                      |
+| `AP_TIMEOUT`   | ❌       | `30000`                      | Request timeout (ms)                 |
+| `AP_RETRIES`   | ❌       | `3`                          | Retry attempts for failed requests   |
+| `AP_DEBUG`     | ❌       | `false`                      | Enable debug logging                 |
+| `AP_LOG_LEVEL` | ❌       | `info`                       | Log level (error, warn, info, debug) |
 
 ### MCP Client Configuration
 
@@ -61,15 +67,15 @@ Add this to your MCP client configuration:
 
 ```json
 {
-  "mcpServers": {
-    "ap-media": {
-      "command": "node",
-      "args": ["path/to/ap-mcp-server/dist/index.js"],
-      "env": {
-        "AP_API_KEY": "your_api_key_here"
-      }
-    }
-  }
+	"mcpServers": {
+		"ap-media": {
+			"command": "node",
+			"args": ["path/to/ap-mcp-server/dist/index.js"],
+			"env": {
+				"AP_API_KEY": "your_api_key_here"
+			}
+		}
+	}
 }
 ```
 
@@ -78,9 +84,11 @@ Add this to your MCP client configuration:
 ### Content Tools
 
 #### `search_content`
+
 Search AP content using flexible query parameters.
 
 **Parameters:**
+
 - `query` (string): Search query
 - `sort` (string): Sort criteria (default: `_score:desc`)
 - `page` (number): Page number (starts at 1)
@@ -91,6 +99,7 @@ Search AP content using flexible query parameters.
 - `in_my_plan` (boolean): Only return items in your plan
 
 **Example:**
+
 ```typescript
 {
   "query": "climate change",
@@ -100,38 +109,47 @@ Search AP content using flexible query parameters.
 ```
 
 #### `get_content_item`
+
 Get a specific content item by its ID.
 
 **Parameters:**
+
 - `item_id` (string, required): The AP item ID
 - `include` (array): Fields to include
 - `exclude` (array): Fields to exclude
 - `pricing` (boolean): Include pricing information
 
 #### `get_content_feed`
+
 Access the live AP content feed.
 
 **Parameters:**
+
 - `query` (string): Filter query
 - `page_size` (number): Number of items to return
 - `include`/`exclude` (arrays): Field filtering
 - `pricing` (boolean): Include pricing
 
 #### `get_rss_feeds`
+
 List all available RSS feeds for your account.
 
 #### `get_rss_feed`
+
 Get content from a specific RSS feed.
 
 **Parameters:**
+
 - `rss_id` (number, required): RSS feed ID
 - `page_size` (number): Items per page
 - `include`/`exclude` (arrays): Field filtering
 
 #### `get_ondemand_content`
+
 Access your organization's OnDemand queue.
 
 **Parameters:**
+
 - `consumer_id` (string): Consumer identifier
 - `queue` (string): Queue ID
 - `page_size` (number): Items per page
@@ -139,15 +157,19 @@ Access your organization's OnDemand queue.
 ### Account Tools
 
 #### `get_account_info`
+
 Get basic account information and available endpoints.
 
 #### `get_account_plans`
+
 View your account plans, entitlements, and usage meters.
 
 #### `get_account_downloads`
+
 View your download history.
 
 **Parameters:**
+
 - `min_date` (string): Start date (YYYY-MM-DD or ISO-8601)
 - `max_date` (string): End date (YYYY-MM-DD or ISO-8601)
 - `format` (string): Response format (`json` or `csv`)
@@ -155,23 +177,28 @@ View your download history.
 ### Monitoring Tools
 
 #### `create_monitor`
+
 Create a new content monitor for alerts.
 
 **Parameters:**
+
 - `name` (string, required): Monitor name
 - `description` (string): Monitor description
 - `conditions` (array): Monitoring conditions
 - `notify` (array): Notification settings
 
 #### `list_monitors`
+
 List all your existing monitors.
 
 ### Utility Tools
 
 #### `build_search_query`
+
 Helper tool to build structured search queries with validation.
 
 **Parameters:**
+
 - `keywords` (array): Keywords to search
 - `operators` (array): Search operators (AND, OR, NOT)
 - `date_range` (object): Date range filters
@@ -182,6 +209,7 @@ Helper tool to build structured search queries with validation.
 This MCP server provides access to the following AP API endpoints:
 
 ### Content Endpoints
+
 - ✅ `/content/search` - Content search
 - ✅ `/content/{item_id}` - Single item lookup
 - ✅ `/content/feed` - Live content feed
@@ -190,6 +218,7 @@ This MCP server provides access to the following AP API endpoints:
 - ✅ `/content/ondemand` - OnDemand queue
 
 ### Account Endpoints
+
 - ✅ `/account` - Account information
 - ✅ `/account/plans` - Plans and entitlements
 - ✅ `/account/downloads` - Download history
@@ -197,6 +226,7 @@ This MCP server provides access to the following AP API endpoints:
 - ✅ `/account/followedtopics` - Followed topics
 
 ### Monitoring Endpoints (Basic)
+
 - ✅ `/account/monitors/create` - Create monitor
 - ✅ `/account/monitors` - List monitors
 - ✅ `/account/monitors/{id}` - Get monitor
@@ -325,6 +355,7 @@ MIT License - see LICENSE file for details.
 ## Support
 
 For issues related to:
+
 - **This MCP server**: Open an issue on GitHub
 - **AP API**: Contact AP support at api.ap.org
 - **MCP protocol**: See the Model Context Protocol documentation
