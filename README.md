@@ -63,7 +63,7 @@ Add to your Claude Code MCP configuration:
 		"ap-media": {
 			"type": "stdio",
 			"command": "npx",
-			"args": ["-y", "ap-mcp-server"],
+			"args": ["-y", "ap-mcp-server@latest"],
 			"env": {
 				"AP_API_KEY": "your_api_key_here"
 			}
@@ -84,7 +84,7 @@ Add the following server definition to your workspace MCP settings (`.vscode/mcp
 		"ap-media": {
 			"type": "stdio",
 			"command": "npx",
-			"args": ["-y", "ap-mcp-server"],
+			"args": ["-y", "ap-mcp-server@latest"],
 			"env": {
 				"AP_API_KEY": "your_api_key_here"
 			}
@@ -104,7 +104,7 @@ For most MCP-compatible AI tools, use this standard configuration format:
 	"mcpServers": {
 		"ap-media": {
 			"command": "npx",
-			"args": ["-y", "ap-mcp-server"],
+			"args": ["-y", "ap-mcp-server@latest"],
 			"env": {
 				"AP_API_KEY": "your_api_key_here"
 			}
@@ -393,12 +393,13 @@ Build structured search queries with validation.
 - `content_types` (array): Content type filters
 
 #### `get_content_rendition`
+
 Retrieve the full content of articles and media by fetching renditions using href URLs.
 
 **Parameters:**
 
 - `href` (string, required): The href URL from a content item's renditions or links
-- `format` (string): Optional Accept header for desired format  
+- `format` (string): Optional Accept header for desired format
 - `encoding` (string): Optional encoding preference for text content
 
 **Use Case:** Get full NITF text, images, videos, audio files from previous search results.
