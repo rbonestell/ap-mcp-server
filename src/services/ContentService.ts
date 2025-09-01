@@ -136,7 +136,7 @@ export class ContentService {
       throw new APValidationError('Page must be a numeric string', 'page', { page: params.page });
     }
 
-    if (params.page_size && (params.page_size < 1 || params.page_size > 100)) {
+    if (params.page_size !== undefined && (params.page_size < 1 || params.page_size > 100)) {
       throw new APValidationError('Page size must be between 1 and 100', 'page_size', { page_size: params.page_size });
     }
 
@@ -170,7 +170,7 @@ export class ContentService {
    * Validate feed parameters
    */
   private validateFeedParams(params: FeedParams): void {
-    if (params.page_size && (params.page_size < 1 || params.page_size > 100)) {
+    if (params.page_size !== undefined && (params.page_size < 1 || params.page_size > 100)) {
       throw new APValidationError('Page size must be between 1 and 100', 'page_size', { page_size: params.page_size });
     }
 
@@ -199,7 +199,7 @@ export class ContentService {
       throw new APValidationError('Exclude must be an array of strings', 'exclude', { exclude: params.exclude });
     }
 
-    if (params.page_size && (params.page_size < 1 || params.page_size > 100)) {
+    if (params.page_size !== undefined && (params.page_size < 1 || params.page_size > 100)) {
       throw new APValidationError('Page size must be between 1 and 100', 'page_size', { page_size: params.page_size });
     }
   }
@@ -224,7 +224,7 @@ export class ContentService {
       throw new APValidationError('Exclude must be an array of strings', 'exclude', { exclude: params.exclude });
     }
 
-    if (params.page_size && (params.page_size < 1 || params.page_size > 100)) {
+    if (params.page_size !== undefined && (params.page_size < 1 || params.page_size > 100)) {
       throw new APValidationError('Page size must be between 1 and 100', 'page_size', { page_size: params.page_size });
     }
   }

@@ -95,16 +95,46 @@ expect.extend({
 
 // Mock implementation helpers
 export const createMockFetchResponse = (data: any, status = 200, ok = true) => {
-  return Promise.resolve({
+  const mockHeaders = new Headers();
+  mockHeaders.set('content-type', 'application/json');
+  if (status === 429) {
+    mockHeaders.set('retry-after', '120');
+  }
+
+  let responseBody: string;
+  try {
+    responseBody = typeof data === 'string' ? data : JSON.stringify(data);
+  } catch (error) {
+    responseBody = String(data || '');
+  }
+
+  // Create a mock response object that implements the Response interface
+  const mockResponse = {
     ok,
     status,
-    statusText: status === 200 ? 'OK' : 'Error',
-    json: () => Promise.resolve(data),
-    text: () => Promise.resolve(JSON.stringify(data)),
-    headers: new Headers({
-      'content-type': 'application/json',
-    }),
-  } as Response);
+    statusText: status === 200 ? 'OK' : 
+               status === 400 ? 'Bad Request' : 
+               status === 401 ? 'Unauthorized' : 
+               status === 404 ? 'Not Found' : 
+               status === 429 ? 'Too Many Requests' : 
+               status === 500 ? 'Internal Server Error' : 'Error',
+    headers: mockHeaders,
+    json: () => Promise.resolve(typeof data === 'string' ? JSON.parse(responseBody) : data),
+    text: () => Promise.resolve(responseBody),
+    // Add other Response methods as needed
+    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+    blob: () => Promise.resolve(new Blob()),
+    formData: () => Promise.resolve(new FormData()),
+    // Response properties
+    body: null,
+    bodyUsed: false,
+    redirected: false,
+    type: 'default' as ResponseType,
+    url: '',
+    clone: function() { return { ...this }; }
+  } as Response;
+
+  return mockResponse;
 };
 
 export const createMockFetchError = (message = 'Network error') => {

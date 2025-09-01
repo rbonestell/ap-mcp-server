@@ -144,7 +144,7 @@ export class AccountService {
       );
     }
 
-    if (params.order && (!Number.isInteger(params.order) || params.order <= 0)) {
+    if (params.order !== undefined && (!Number.isInteger(params.order) || params.order <= 0)) {
       throw new APValidationError('Order must be a positive integer', 'order', { order: params.order });
     }
 
@@ -191,7 +191,9 @@ export class AccountService {
   private isValidDateString(dateString: string): boolean {
     // Check for YYYY-MM-DD format
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-      return !isNaN(Date.parse(dateString));
+      const date = new Date(dateString + 'T00:00:00.000Z');
+      // Check if date is valid and matches original string (catches invalid dates like 2023-02-29)
+      return !isNaN(date.getTime()) && date.toISOString().startsWith(dateString);
     }
     
     // Check for YYYY-MM-DDTHH:mm:ss format

@@ -1,5 +1,5 @@
 import { APConfigManager } from '../config/APConfig.js';
-import { APNetworkError, APRateLimitError, ErrorHandler, isAPError, APError } from '../errors/APError.js';
+import { APError, APNetworkError, APRateLimitError, ErrorHandler, isAPError } from '../errors/APError.js';
 
 /**
  * HTTP client options
@@ -73,7 +73,7 @@ export class APHttpClient {
    */
   private buildUrlWithParams(endpoint: string, params?: Record<string, any>): string {
     const baseUrl = this.config.buildUrl(endpoint);
-    
+
     if (!params || Object.keys(params).length === 0) {
       return baseUrl;
     }
@@ -115,23 +115,38 @@ export class APHttpClient {
       }
 
       const response = await fetch(url, requestInit);
-      
+
       // Clear timeout since request completed
       clearTimeout(timeoutId);
+
 
       return await this.processResponse(response);
     } catch (error) {
       clearTimeout(timeoutId);
-      
+
+      // Check if this is a network error
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new APNetworkError(`Request timeout after ${this.options.timeout}ms`, error);
+      }
+
+      // Check if this is an HTTP error thrown from processResponse
+      if (error instanceof APError) {
+        throw error;
+      }
+
+      // Check for fetch errors in a safe way
       if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          throw new APNetworkError(`Request timeout after ${this.options.timeout}ms`, error);
-        }
-        if (error.message.includes('fetch')) {
-          throw new APNetworkError(`Network request failed: ${error.message}`, error);
+        try {
+          const message = String(error.message || error);
+          if (message.includes('fetch') || message.includes('Failed to fetch') || message.includes('Network error')) {
+            throw new APNetworkError(`Network request failed: ${message}`, error);
+          }
+        } catch (msgError) {
+          // If we can't check the message safely, but it's an Error instance from fetch, treat as network error
+          throw new APNetworkError('Network request failed', error);
         }
       }
-      
+
       throw ErrorHandler.handleError(error);
     }
   }
@@ -140,32 +155,76 @@ export class APHttpClient {
    * Process the HTTP response
    */
   private async processResponse(response: Response): Promise<HttpResponse> {
+    // Safeguard for null or undefined response
+    if (!response) {
+      throw new APError('Invalid response object', 'HTTP_ERROR', undefined, {});
+    }
+
     const headers: Record<string, string> = {};
-    response.headers.forEach((value, key) => {
-      headers[key] = value;
-    });
+    try {
+      if (response.headers && response.headers.forEach) {
+        response.headers.forEach((value, key) => {
+          headers[key] = value;
+        });
+      }
+    } catch (headerError) {
+      // Headers access failed, continue with empty headers
+    }
 
     let data: any;
-    const contentType = response.headers.get('content-type') || '';
-    
+    let contentType = '';
     try {
-      if (contentType.includes('application/json')) {
-        data = await response.json();
-      } else if (contentType.includes('text/xml') || contentType.includes('application/xml')) {
-        data = await response.text();
-      } else {
-        data = await response.text();
+      contentType = (response && response.headers && response.headers.get)
+        ? response.headers.get('content-type') || ''
+        : '';
+    } catch (headerError) {
+      // Content-type access failed, use empty string
+      contentType = '';
+    }
+
+    if (contentType.includes('application/json')) {
+      // For JSON, read as text first then try to parse
+      try {
+        const textData = await response.text();
+        try {
+          data = JSON.parse(textData);
+        } catch (parseError) {
+          const isOk = response && response.ok !== false;
+          if (!isOk) {
+            // For error responses with malformed JSON, pass the raw text as the error message
+            const errorBody = { error: { message: textData || 'Malformed JSON response' } };
+            throw ErrorHandler.handleHttpError(response, errorBody);
+          }
+          // If response is ok but can't parse JSON, return raw text
+          data = textData;
+        }
+      } catch (textError) {
+        // Check if this is already an AP error from the inner try/catch
+        if (textError instanceof APError) {
+          throw textError;
+        }
+        // Only create a new error if textError is not already handled
+        const isOk = response && response.ok !== false;
+        if (!isOk) {
+          throw ErrorHandler.handleHttpError(response);
+        }
+        data = 'Unable to read response';
       }
-    } catch (parseError) {
-      if (!response.ok) {
-        throw ErrorHandler.handleHttpError(response);
+    } else {
+      // For non-JSON, just get as text
+      try {
+        data = await response.text();
+      } catch (textError) {
+        data = 'Unable to read response';
       }
-      // If response is ok but can't parse, return raw text
-      data = await response.text();
     }
 
     // Handle error responses
-    if (!response.ok) {
+    if (!response || response.ok === false) {
+      // Ensure response is valid before passing to error handler
+      if (!response) {
+        throw new APError('Invalid response object', 'HTTP_ERROR', undefined, { data });
+      }
       throw ErrorHandler.handleHttpError(response, data);
     }
 
@@ -184,13 +243,13 @@ export class APHttpClient {
     requestFn: () => Promise<HttpResponse<T>>
   ): Promise<HttpResponse<T>> {
     let lastError: APError;
-    
+
     for (let attempt = 0; attempt <= this.options.retries; attempt++) {
       try {
         return await requestFn();
       } catch (error) {
         lastError = ErrorHandler.handleError(error);
-        
+
         // Don't retry on certain error types
         if (this.shouldNotRetry(lastError) || attempt === this.options.retries) {
           throw lastError;
@@ -201,7 +260,7 @@ export class APHttpClient {
         await this.sleep(delay);
       }
     }
-    
+
     throw lastError!;
   }
 
@@ -213,17 +272,17 @@ export class APHttpClient {
     if (error.statusCode === 401) {
       return true;
     }
-    
+
     // Don't retry validation errors
     if (error.statusCode === 400) {
       return true;
     }
-    
+
     // Don't retry forbidden
     if (error.statusCode === 403) {
       return true;
     }
-    
+
     // Don't retry not found
     if (error.statusCode === 404) {
       return true;
@@ -233,7 +292,12 @@ export class APHttpClient {
     if (error instanceof APRateLimitError) {
       return false;
     }
-    
+
+    // Don't retry timeout/abort errors
+    if (error instanceof APNetworkError && error.message.includes('timeout')) {
+      return true;
+    }
+
     // Retry network errors and server errors
     return false;
   }

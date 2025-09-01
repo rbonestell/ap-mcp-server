@@ -296,7 +296,7 @@ describe('ErrorHandler', () => {
 
     test('should convert network-like errors to APNetworkError', () => {
       const timeoutError = new Error('Request timeout');
-      const handled = ErrorHandler.handleError(timeoutError);
+      const handled = ErrorHandler.handleError(timeoutError) as APNetworkError;
 
       expect(handled).toBeInstanceOf(APNetworkError);
       expect(handled.message).toBe('Network error: Request timeout');
@@ -469,8 +469,10 @@ describe('ErrorHandler', () => {
 
       const error = ErrorHandler.handleHttpError(response);
 
-      expect(error).toBeInstanceOf(APValidationError);
+      expect(error).toBeInstanceOf(APAPIError);
       expect(error.message).toBe('Bad Request: Bad Request');
+      expect(error.code).toBe('BAD_REQUEST');
+      expect(error.statusCode).toBe(400);
     });
 
     test('should handle malformed error body', () => {
