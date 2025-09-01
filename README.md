@@ -4,10 +4,10 @@
 <a href="https://github.com/rbonestell/ap-mcp-server/actions/workflows/build.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/rbonestell/ap-mcp-server/build.yml?logo=typescript&logoColor=white" alt="Build Status"></a>
 <a href="https://github.com/rbonestell/ap-mcp-server/actions/workflows/test.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/rbonestell/ap-mcp-server/test.yml?branch=main&logo=jest&logoColor=white&label=tests" alt="Test Results"></a>
 <a href="https://app.codecov.io/gh/rbonestell/ap-mcp-server/"><img src="https://img.shields.io/codecov/c/github/rbonestell/ap-mcp-server?logo=codecov&logoColor=white" alt="Code Coverage"></a>
-<img src="https://img.shields.io/badge/tools-27-brightgreen.svg?logo=modelcontextprotocol" alt="27 Available Tools">
+<img src="https://img.shields.io/badge/tools-26-brightgreen.svg?logo=modelcontextprotocol" alt="26 Available Tools">
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
 
-An _**unofficial**_ Model Context Protocol (MCP) server that transforms the Associated Press Media API into an **AI-optimized content intelligence resource**. With 27 powerful tools, this MCP server enables conversational AI applications to seamlessly access, analyze, and interact with AP's comprehensive news content through natural language interfaces.
+An _**unofficial**_ Model Context Protocol (MCP) server that transforms the Associated Press Media API into an **AI-optimized content intelligence resource**. With 26 powerful tools, this MCP server enables conversational AI applications to seamlessly access, analyze, and interact with AP's comprehensive news content through natural language interfaces.
 
 **Perfect for**: Conversational AI assistants, news analysis applications, content research tools, and automated journalism workflows.
 
@@ -32,7 +32,7 @@ An _**unofficial**_ Model Context Protocol (MCP) server that transforms the Asso
 
 ### 📰 Complete Content Intelligence
 
-- **27 Comprehensive Tools**: Full coverage of AP Media API functionality
+- **26 Comprehensive Tools**: Full coverage of AP Media API functionality
 - **Live Content Feeds**: Real-time access to AP's breaking news and updates
 - **Advanced Search**: Multi-parameter search with flexible filtering and sorting
 - **Content Monitoring**: Create and manage automated content alerts and monitors
@@ -157,7 +157,7 @@ AI tools automatically convert these requests into the appropriate MCP tool call
 | `AP_CACHE_TTL_TRENDS` | ❌       | `300000`                     | Trending topics cache TTL (5 minutes) |
 | `AP_CACHE_TTL_SEARCH` | ❌       | `180000`                     | Search results cache TTL (3 minutes)  |
 
-## 🛠️ Available Tools (27 Total)
+## 🛠️ Available Tools (26 Total)
 
 ### 🔍 Core Search & Content Tools
 
