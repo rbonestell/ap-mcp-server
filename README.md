@@ -1,5 +1,11 @@
 # Associated Press MCP Server
 
+<a href="https://www.npmjs.com/package/ap-mcp-server"><img src="https://img.shields.io/npm/v/ap-mcp-server.svg" alt="NPM Version"></a>
+<a href="https://github.com/rbonestell/ap-mcp-server/actions/workflows/build.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/rbonestell/ap-mcp-server/build.yml?logo=typescript&logoColor=white" alt="Build Status"></a>
+<a href="https://github.com/rbonestell/ap-mcp-server/actions/workflows/test.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/rbonestell/ap-mcp-server/test.yml?branch=main&logo=jest&logoColor=white&label=tests" alt="Test Results"></a>
+<a href="https://app.codecov.io/gh/rbonestell/ap-mcp-server/"><img src="https://img.shields.io/codecov/c/github/rbonestell/ap-mcp-server?logo=codecov&logoColor=white" alt="Code Coverage"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
+
 A Model Context Protocol (MCP) server that provides access to the Associated Press Media API. This server allows MCP clients to search, retrieve, and interact with AP's comprehensive news content, account information, and monitoring capabilities.
 
 > [!NOTE]
