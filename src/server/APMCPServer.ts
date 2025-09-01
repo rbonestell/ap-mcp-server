@@ -881,6 +881,28 @@ export class APMCPServer {
               },
             },
           },
+          {
+            name: 'get_content_rendition',
+            description: 'Get the full content of an article or media item by fetching its rendition using the href URL from a previous response',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                href: {
+                  type: 'string',
+                  description: 'The href URL from a content item\'s renditions or links (e.g., for NITF text, images, videos, audio files)'
+                },
+                format: {
+                  type: 'string',
+                  description: 'Optional Accept header to specify desired format (e.g., "text/plain", "application/xml")'
+                },
+                encoding: {
+                  type: 'string',
+                  description: 'Optional encoding preference for text content'
+                }
+              },
+              required: ['href'],
+            },
+          },
         ],
       };
     });
@@ -965,6 +987,9 @@ export class APMCPServer {
 
           case 'get_trending_subjects':
             return await this.handleGetTrendingSubjects(args);
+
+          case 'get_content_rendition':
+            return await this.handleGetContentRendition(args);
 
           default:
             throw new McpError(
@@ -1686,6 +1711,73 @@ export class APMCPServer {
   }
 
   /**
+   * Handle get content rendition tool
+   */
+  private async handleGetContentRendition(args: any) {
+    const { href, format, encoding } = args;
+
+    if (!href) {
+      throw new APError('href is required', 'VALIDATION_ERROR', 400);
+    }
+
+    const params = { format, encoding };
+    const renditionResult = await this.contentService.getContentRendition(href, params);
+
+    // For binary content, we need to handle it specially
+    let contentDisplay: string;
+    let isText = false;
+
+    if (Buffer.isBuffer(renditionResult.content)) {
+      // Binary content - provide metadata and truncated preview
+      contentDisplay = `[Binary content: ${renditionResult.contentType}, ${renditionResult.contentLength || 'unknown'} bytes]`;
+      if (renditionResult.contentType.startsWith('image/')) {
+        contentDisplay += `\n[Image file: ${renditionResult.fileName}]`;
+      } else if (renditionResult.contentType.startsWith('video/')) {
+        contentDisplay += `\n[Video file: ${renditionResult.fileName}]`;
+      } else if (renditionResult.contentType.startsWith('audio/')) {
+        contentDisplay += `\n[Audio file: ${renditionResult.fileName}]`;
+      }
+      contentDisplay += '\n\nNote: Binary content cannot be displayed in text format. Use appropriate tools to download and view the content.';
+    } else {
+      // Text content
+      isText = true;
+      contentDisplay = renditionResult.content;
+      // Truncate very long text content for display
+      if (contentDisplay.length > 50000) {
+        contentDisplay = contentDisplay.substring(0, 50000) + '\n\n[Content truncated - showing first 50,000 characters]';
+      }
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            summary: {
+              operation: 'get_content_rendition',
+              href: href,
+              content_type: renditionResult.contentType,
+              content_length: renditionResult.contentLength,
+              file_name: renditionResult.fileName,
+              is_text_content: isText,
+              is_binary_content: !isText,
+              content_preview_available: isText,
+            },
+            content: contentDisplay,
+            metadata: {
+              content_type: renditionResult.contentType,
+              content_length: renditionResult.contentLength,
+              file_name: renditionResult.fileName,
+              original_href: href,
+              request_parameters: params,
+            },
+          }, null, 2),
+        },
+      ],
+    };
+  }
+
+  /**
    * Convert AP error to MCP error code
    */
   private getMcpErrorCode(error: APError): ErrorCode {
@@ -1803,7 +1895,8 @@ export class APMCPServer {
       'get_content_recommendations',
       'search_content_all',
       'get_content_bulk',
-      'get_trending_subjects'
+      'get_trending_subjects',
+      'get_content_rendition'
     ];
     return tools;
   }

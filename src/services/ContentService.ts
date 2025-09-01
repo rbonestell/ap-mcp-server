@@ -1,4 +1,4 @@
-import { APAPIError, APError, APValidationError } from '../errors/APError.js';
+import { APAPIError, APError, APNetworkError, APValidationError } from '../errors/APError.js';
 import { APHttpClient } from '../http/APHttpClient.js';
 import {
 	BulkContentParams,
@@ -142,6 +142,118 @@ export class ContentService {
       return response.data;
     } catch (error) {
       throw this.handleServiceError('getOnDemandContent', error, params);
+    }
+  }
+
+  /**
+   * Get content rendition from href URL
+   * @param href The href URL from a content item's renditions or links
+   * @param params Optional parameters for the rendition request
+   * @returns The rendition content (could be text, binary data, etc.)
+   */
+  async getContentRendition(href: string, params: {
+    format?: string;
+    encoding?: string;
+  } = {}): Promise<{
+    content: string | Buffer;
+    contentType: string;
+    contentLength?: number;
+    fileName?: string;
+  }> {
+    if (!href || typeof href !== 'string') {
+      throw new APValidationError('href is required and must be a string', 'href', { href });
+    }
+
+    // Validate that this looks like a valid AP API URL
+    const url = new URL(href);
+    if (!url.hostname.includes('api.ap.org') && !url.hostname.includes('apnews.org')) {
+      throw new APValidationError('Invalid AP API href URL', 'href', { href, hostname: url.hostname });
+    }
+
+    try {
+      // Use the HTTP client's raw fetch capabilities, but we need to handle this differently
+      // since renditions may return various content types (text, images, videos, etc.)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for renditions
+
+      // Get headers from the HTTP client (which includes the API key)
+      const baseHeaders = (this.httpClient as any).config.getHttpHeaders();
+      
+      const requestInit: RequestInit = {
+        method: 'GET',
+        headers: {
+          'x-api-key': baseHeaders['x-api-key'], // Use the same API key
+          'Accept': '*/*', // Accept any content type
+          'User-Agent': baseHeaders['User-Agent'] || 'AP-MCP-Server/1.0.0',
+          ...(params.format && { 'Accept': params.format }),
+        },
+        signal: controller.signal,
+      };
+
+      const response = await fetch(href, requestInit);
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new APAPIError(
+          `Failed to fetch rendition: ${response.status} ${response.statusText}`,
+          response.status,
+          'RENDITION_FETCH_ERROR',
+          { href, status: response.status, statusText: response.statusText }
+        );
+      }
+
+      const contentType = response.headers.get('content-type') || 'application/octet-stream';
+      const contentLength = response.headers.get('content-length') ? 
+        parseInt(response.headers.get('content-length')!) : undefined;
+      
+      // Extract filename from Content-Disposition header or URL
+      let fileName: string | undefined;
+      const contentDisposition = response.headers.get('content-disposition');
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch) {
+          fileName = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+      if (!fileName) {
+        // Extract from URL path
+        const urlPath = new URL(href).pathname;
+        const pathParts = urlPath.split('/');
+        fileName = pathParts[pathParts.length - 1] || 'rendition';
+      }
+
+      let content: string | Buffer;
+
+      // Determine if this is text content or binary
+      if (contentType.startsWith('text/') || 
+          contentType.includes('json') || 
+          contentType.includes('xml') || 
+          contentType.includes('html')) {
+        // Text content
+        content = await response.text();
+      } else {
+        // Binary content - return as Buffer
+        const arrayBuffer = await response.arrayBuffer();
+        content = Buffer.from(arrayBuffer);
+      }
+
+      return {
+        content,
+        contentType,
+        contentLength,
+        fileName,
+      };
+
+    } catch (error) {
+      if (error instanceof APError) {
+        throw error;
+      }
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new APNetworkError('Rendition request timeout after 30 seconds', error);
+      }
+
+      throw this.handleServiceError('getContentRendition', error, { href, params });
     }
   }
 
