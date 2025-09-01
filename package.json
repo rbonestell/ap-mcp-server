@@ -19,8 +19,7 @@
 		"lint:fix": "eslint --fix .",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
-		"format:fix": "prettier --write . && eslint --fix .",
-		"prepublishOnly": "npm run build && npm test"
+		"format:fix": "prettier --write . && eslint --fix ."
 	},
 	"lint-staged": {
 		"*": "npm run format:fix"
