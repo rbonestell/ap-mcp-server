@@ -209,6 +209,64 @@ export class MonitoringService {
   }
 
   /**
+   * Get monitor status and alerts
+   * @param monitorId Monitor ID or name
+   * @param options Status query options
+   * @returns Monitor status information
+   */
+  async getMonitorStatus(monitorId: string, options: {
+    show_detail?: boolean;
+    agentid?: string;
+  } = {}): Promise<MonitorsResponse> {
+    if (!monitorId || typeof monitorId !== 'string') {
+      throw new APValidationError('Monitor ID is required and must be a string', 'monitorId', { monitorId });
+    }
+
+    this.validateStatusParams(options);
+
+    try {
+      const response = await this.httpClient.get<MonitorsResponse>(
+        `account/monitors/${encodeURIComponent(monitorId)}/status`,
+        options
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleServiceError('getMonitorStatus', error, { monitorId, options });
+    }
+  }
+
+  /**
+   * Get monitor activity history
+   * @param monitorId Monitor ID or name
+   * @param options History query options
+   * @returns Monitor activity history
+   */
+  async getMonitorHistory(monitorId: string, options: {
+    show_detail?: boolean;
+    agentid?: string;
+    min_date?: string;
+    max_date?: string;
+    page?: string;
+    page_size?: number;
+  } = {}): Promise<MonitorsResponse> {
+    if (!monitorId || typeof monitorId !== 'string') {
+      throw new APValidationError('Monitor ID is required and must be a string', 'monitorId', { monitorId });
+    }
+
+    this.validateHistoryParams(options);
+
+    try {
+      const response = await this.httpClient.get<MonitorsResponse>(
+        `account/monitors/${encodeURIComponent(monitorId)}/history`,
+        options
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleServiceError('getMonitorHistory', error, { monitorId, options });
+    }
+  }
+
+  /**
    * Validate monitor definition
    */
   private validateMonitor(monitor: Monitor): void {
@@ -345,6 +403,78 @@ export class MonitoringService {
 
     if (options.agentid !== undefined && typeof options.agentid !== 'string') {
       throw new APValidationError('agentid must be a string', 'agentid', { agentid: options.agentid });
+    }
+  }
+
+  /**
+   * Validate status parameters
+   */
+  private validateStatusParams(options: any): void {
+    if (options.show_detail !== undefined && typeof options.show_detail !== 'boolean') {
+      throw new APValidationError('show_detail must be a boolean', 'show_detail', { show_detail: options.show_detail });
+    }
+
+    if (options.agentid !== undefined && typeof options.agentid !== 'string') {
+      throw new APValidationError('agentid must be a string', 'agentid', { agentid: options.agentid });
+    }
+  }
+
+  /**
+   * Validate history parameters
+   */
+  private validateHistoryParams(options: any): void {
+    if (options.show_detail !== undefined && typeof options.show_detail !== 'boolean') {
+      throw new APValidationError('show_detail must be a boolean', 'show_detail', { show_detail: options.show_detail });
+    }
+
+    if (options.agentid !== undefined && typeof options.agentid !== 'string') {
+      throw new APValidationError('agentid must be a string', 'agentid', { agentid: options.agentid });
+    }
+
+    if (options.min_date !== undefined && typeof options.min_date !== 'string') {
+      throw new APValidationError('min_date must be a string', 'min_date', { min_date: options.min_date });
+    }
+
+    if (options.max_date !== undefined && typeof options.max_date !== 'string') {
+      throw new APValidationError('max_date must be a string', 'max_date', { max_date: options.max_date });
+    }
+
+    if (options.page !== undefined && typeof options.page !== 'string') {
+      throw new APValidationError('page must be a string', 'page', { page: options.page });
+    }
+
+    if (options.page_size !== undefined) {
+      if (!Number.isInteger(options.page_size) || options.page_size < 1 || options.page_size > 100) {
+        throw new APValidationError('page_size must be an integer between 1 and 100', 'page_size', { page_size: options.page_size });
+      }
+    }
+
+    // Validate individual dates if provided
+    if (options.min_date !== undefined) {
+      const minDate = new Date(options.min_date);
+      if (isNaN(minDate.getTime())) {
+        throw new APValidationError('min_date is not a valid date', 'min_date', { min_date: options.min_date });
+      }
+    }
+
+    if (options.max_date !== undefined) {
+      const maxDate = new Date(options.max_date);
+      if (isNaN(maxDate.getTime())) {
+        throw new APValidationError('max_date is not a valid date', 'max_date', { max_date: options.max_date });
+      }
+    }
+
+    // Validate date range if both dates are provided
+    if (options.min_date && options.max_date) {
+      const minDate = new Date(options.min_date);
+      const maxDate = new Date(options.max_date);
+
+      if (minDate > maxDate) {
+        throw new APValidationError('min_date must be before max_date', 'date_range', { 
+          min_date: options.min_date, 
+          max_date: options.max_date 
+        });
+      }
     }
   }
 

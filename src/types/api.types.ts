@@ -539,3 +539,271 @@ export interface APConfig {
   timeout?: number;
   retries?: number;
 }
+
+/**
+ * Parameters for optimize search query tool
+ */
+export interface OptimizeQueryParams {
+  natural_query: string;
+  suggest_filters?: boolean;
+  content_preferences?: {
+    preferred_types?: ('text' | 'picture' | 'graphic' | 'audio' | 'video')[];
+    preferred_subjects?: string[];
+    preferred_locations?: string[];
+    recency_preference?: 'latest' | 'recent' | 'any';
+  };
+  optimize_for?: 'relevance' | 'recency' | 'popularity';
+}
+
+/**
+ * Response structure for optimize search query
+ */
+export interface OptimizeQueryResponse {
+  optimized_query: string;
+  original_query: string;
+  transformations_applied: {
+    temporal_filters?: string[];
+    content_type_filters?: string[];
+    location_filters?: string[];
+    subject_filters?: string[];
+    other_filters?: string[];
+  };
+  suggestions?: {
+    additional_filters?: string[];
+    alternative_queries?: string[];
+    search_tips?: string[];
+  };
+  confidence_score: number;
+}
+
+/**
+ * Parameters for content trend analysis
+ */
+export interface ContentTrendsParams {
+  timeframe?: 'hour' | 'day' | 'week';
+  content_types?: ('text' | 'picture' | 'graphic' | 'audio' | 'video')[];
+  max_topics?: number;
+  include_metrics?: boolean;
+  location_filter?: string;
+  subject_filter?: string;
+}
+
+/**
+ * Trending topic data structure
+ */
+export interface TrendingTopic {
+  subject_name: string;
+  subject_code?: string;
+  frequency: number;
+  trend_direction: 'rising' | 'stable' | 'declining';
+  trend_strength: number;
+  sample_content_ids: string[];
+  related_subjects?: string[];
+  geographic_distribution?: Record<string, number>;
+}
+
+/**
+ * Response structure for content trends analysis
+ */
+export interface ContentTrendsResponse {
+  timeframe: string;
+  analysis_period: {
+    start: string;
+    end: string;
+  };
+  trending_topics: TrendingTopic[];
+  total_content_analyzed: number;
+  content_types_analyzed: string[];
+  metrics: {
+    top_rising_topics: string[];
+    most_frequent_topics: string[];
+    geographic_hotspots?: string[];
+  };
+}
+
+/**
+ * Parameters for content recommendations
+ */
+export interface ContentRecommendationsParams {
+  seed_content?: string[];
+  subjects?: string[];
+  content_types?: ('text' | 'picture' | 'graphic' | 'audio' | 'video')[];
+  max_recommendations?: number;
+  exclude_seen?: string[];
+  location_preference?: string;
+  recency_preference?: 'latest' | 'recent' | 'any';
+  similarity_threshold?: number;
+}
+
+/**
+ * Content recommendation with relevance scoring
+ */
+export interface ContentRecommendation {
+  content_id: string;
+  content_summary: {
+    title?: string;
+    headline?: string;
+    type: string;
+    publish_date?: string;
+    subjects?: string[];
+    locations?: string[];
+  };
+  relevance_score: number;
+  recommendation_reason: string;
+  related_subjects: string[];
+  similarity_factors: {
+    subject_overlap?: number;
+    location_overlap?: number;
+    temporal_relevance?: number;
+    content_type_match?: number;
+  };
+}
+
+/**
+ * Response structure for content recommendations
+ */
+export interface ContentRecommendationsResponse {
+  recommendations: ContentRecommendation[];
+  seed_analysis?: {
+    common_subjects: string[];
+    common_locations: string[];
+    content_type_distribution: Record<string, number>;
+  };
+  total_recommendations: number;
+  search_strategy: string;
+  filters_applied: string[];
+}
+
+/**
+ * Parameters for auto-pagination search
+ */
+export interface SearchAllParams extends SearchParams {
+  max_results?: number;
+  progress_updates?: boolean;
+  deduplicate?: boolean;
+}
+
+/**
+ * Performance statistics for operations
+ */
+export interface PerformanceStats {
+  processing_time_ms: number;
+  pages_fetched?: number;
+  items_processed?: number;
+  cache_hits?: number;
+  cache_misses?: number;
+  success_rate: number;
+  batch_count?: number;
+  errors?: string[];
+}
+
+/**
+ * Response structure for auto-pagination search
+ */
+export interface SearchAllResponse {
+  summary: {
+    operation: string;
+    total_results: number;
+    pages_fetched: number;
+    cache_hits: number;
+    processing_time_ms: number;
+    success_rate: number;
+    deduplicated_count?: number;
+  };
+  full_response: {
+    items: ContentResult[];
+    performance_stats: PerformanceStats;
+    pagination_info: {
+      total_pages: number;
+      max_results_reached: boolean;
+      final_page_size: number;
+    };
+    errors?: any[];
+  };
+}
+
+/**
+ * Parameters for bulk content retrieval
+ */
+export interface BulkContentParams {
+  item_ids: string[];
+  include?: string[];
+  exclude?: string[];
+  fail_on_missing?: boolean;
+  batch_size?: number;
+}
+
+/**
+ * Bulk content retrieval result
+ */
+export interface BulkContentResult {
+  content_id: string;
+  success: boolean;
+  content?: ContentResult;
+  error?: string;
+}
+
+/**
+ * Response structure for bulk content retrieval
+ */
+export interface BulkContentResponse {
+  summary: {
+    operation: string;
+    total_results: number;
+    successful_retrievals: number;
+    failed_retrievals: number;
+    processing_time_ms: number;
+    success_rate: number;
+    batch_count: number;
+  };
+  full_response: {
+    items: BulkContentResult[];
+    performance_stats: PerformanceStats;
+    missing_item_ids: string[];
+    errors?: any[];
+  };
+}
+
+/**
+ * Parameters for trending subjects discovery
+ */
+export interface TrendingSubjectsParams {
+  timeframe?: 'hour' | 'day' | 'week';
+  max_subjects?: number;
+  min_frequency?: number;
+  subject_types?: string[];
+}
+
+/**
+ * Trending subject data
+ */
+export interface TrendingSubject {
+  subject_name: string;
+  subject_code?: string;
+  frequency: number;
+  trend_score: number;
+  sample_content_ids: string[];
+}
+
+/**
+ * Response structure for trending subjects discovery
+ */
+export interface TrendingSubjectsResponse {
+  summary: {
+    operation: string;
+    total_results: number;
+    timeframe: string;
+    processing_time_ms: number;
+    success_rate: number;
+    cache_hits?: number;
+  };
+  full_response: {
+    items: TrendingSubject[];
+    performance_stats: PerformanceStats;
+    analysis_period: {
+      start: string;
+      end: string;
+    };
+    content_analyzed: number;
+  };
+}

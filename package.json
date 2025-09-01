@@ -1,6 +1,6 @@
 {
 	"name": "ap-mcp-server",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"description": "Model Context Protocol (MCP) server for the Associated Press Media API",
 	"main": "dist/index.js",
 	"bin": {
@@ -31,7 +31,18 @@
 		"ap-api",
 		"news-api",
 		"media-api",
-		"typescript"
+		"typescript",
+		"journalism",
+		"news",
+		"newswire",
+		"press",
+		"api-server",
+		"ai-integration",
+		"content-syndication",
+		"breaking-news",
+		"wire-service",
+		"news-feed",
+		"media-integration"
 	],
 	"author": "Bobby Bonestell",
 	"license": "MIT",
