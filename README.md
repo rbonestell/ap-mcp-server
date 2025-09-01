@@ -75,8 +75,8 @@ Add this to your MCP client configuration:
 {
 	"mcpServers": {
 		"ap-media": {
-			"command": "node",
-			"args": ["path/to/ap-mcp-server/dist/index.js"],
+			"command": "npx",
+			"args": ["ap-mcp-server"],
 			"env": {
 				"AP_API_KEY": "your_api_key_here"
 			}
@@ -241,41 +241,6 @@ This MCP server provides access to the following AP API endpoints:
 
 ## Development
 
-### Project Structure
-
-```
-src/
-├── server/
-│   └── APMCPServer.ts          # Main MCP server
-├── services/
-│   ├── ContentService.ts       # Content API operations
-│   ├── AccountService.ts       # Account operations
-│   └── MonitoringService.ts    # Monitor management
-├── http/
-│   └── APHttpClient.ts         # HTTP client with retry logic
-├── types/
-│   └── api.types.ts           # TypeScript type definitions
-├── config/
-│   └── APConfig.ts            # Configuration management
-├── errors/
-│   └── APError.ts             # Error handling
-├── utils/
-│   └── validators.ts          # Input validation
-└── index.ts                   # Entry point
-```
-
-### Scripts
-
-```bash
-npm run build       # Build TypeScript
-npm run dev         # Build and start
-npm start          # Start the server
-npm test           # Run tests
-npm run lint       # Lint TypeScript files
-npm run format     # Format code with Prettier
-npm run clean      # Remove build artifacts
-```
-
 ### Error Handling
 
 The server implements comprehensive error handling:
@@ -292,12 +257,6 @@ Run the test suite:
 
 ```bash
 npm test
-```
-
-Test with a real AP API key:
-
-```bash
-AP_API_KEY=your_key npm test
 ```
 
 ## Security
