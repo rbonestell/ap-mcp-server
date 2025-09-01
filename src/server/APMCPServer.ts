@@ -1,19 +1,19 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
-  CallToolRequestSchema,
-  CallToolRequest,
-  ErrorCode,
-  ListToolsRequestSchema,
-  McpError,
+	CallToolRequest,
+	CallToolRequestSchema,
+	ErrorCode,
+	ListToolsRequestSchema,
+	McpError,
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { APConfigManager } from '../config/APConfig.js';
+import { APError, ErrorHandler, isAPError } from '../errors/APError.js';
 import { APHttpClient } from '../http/APHttpClient.js';
-import { ContentService } from '../services/ContentService.js';
 import { AccountService } from '../services/AccountService.js';
+import { ContentService } from '../services/ContentService.js';
 import { MonitoringService } from '../services/MonitoringService.js';
-import { ErrorHandler, isAPError, APError } from '../errors/APError.js';
 
 /**
  * Main MCP Server for Associated Press API
@@ -29,7 +29,7 @@ export class APMCPServer {
   constructor(config?: Partial<import('../types/api.types.js').APConfig>) {
     // Initialize configuration
     this.config = config ? new APConfigManager(config) : APConfigManager.fromEnvironment();
-    
+
     // Initialize HTTP client and services
     this.httpClient = new APHttpClient(this.config);
     this.contentService = new ContentService(this.httpClient);
@@ -65,21 +65,21 @@ export class APMCPServer {
               type: 'object',
               properties: {
                 q: { type: 'string', description: 'Search query string' },
-                include: { 
-                  type: 'array', 
+                include: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Fields to include in response'
                 },
-                exclude: { 
-                  type: 'array', 
+                exclude: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Fields to exclude from response'
                 },
                 sort: { type: 'string', description: 'Sort order' },
                 page: { type: 'string', description: 'Page number (as string)' },
-                page_size: { 
-                  type: 'integer', 
-                  minimum: 1, 
+                page_size: {
+                  type: 'integer',
+                  minimum: 1,
                   maximum: 100,
                   description: 'Number of items per page (1-100)'
                 },
@@ -95,17 +95,17 @@ export class APMCPServer {
             inputSchema: {
               type: 'object',
               properties: {
-                item_id: { 
-                  type: 'string', 
-                  description: 'The unique identifier for the content item' 
+                item_id: {
+                  type: 'string',
+                  description: 'The unique identifier for the content item'
                 },
-                include: { 
-                  type: 'array', 
+                include: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Fields to include in response'
                 },
-                exclude: { 
-                  type: 'array', 
+                exclude: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Fields to exclude from response'
                 },
@@ -123,26 +123,26 @@ export class APMCPServer {
               type: 'object',
               properties: {
                 q: { type: 'string', description: 'Filter query string' },
-                include: { 
-                  type: 'array', 
+                include: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Fields to include in response'
                 },
-                exclude: { 
-                  type: 'array', 
+                exclude: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Fields to exclude from response'
                 },
-                page_size: { 
-                  type: 'integer', 
-                  minimum: 1, 
+                page_size: {
+                  type: 'integer',
+                  minimum: 1,
                   maximum: 100,
                   description: 'Number of items per page (1-100)'
                 },
                 pricing: { type: 'boolean', description: 'Include pricing information' },
                 in_my_plan: { type: 'boolean', description: 'Only show content in your plan' },
-                with_monitor: { 
-                  type: 'string', 
+                with_monitor: {
+                  type: 'string',
                   minLength: 4,
                   maxLength: 24,
                   pattern: '^[a-zA-Z0-9_.-]*$',
@@ -167,18 +167,18 @@ export class APMCPServer {
             inputSchema: {
               type: 'object',
               properties: {
-                include: { 
-                  type: 'array', 
+                include: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Fields to include in response'
                 },
-                exclude: { 
-                  type: 'array', 
+                exclude: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Fields to exclude from response'
                 },
-                format: { 
-                  type: 'string', 
+                format: {
+                  type: 'string',
                   enum: ['json', 'csv'],
                   description: 'Response format'
                 },
@@ -191,31 +191,31 @@ export class APMCPServer {
             inputSchema: {
               type: 'object',
               properties: {
-                include: { 
-                  type: 'array', 
+                include: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Fields to include in response'
                 },
-                exclude: { 
-                  type: 'array', 
+                exclude: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Fields to exclude from response'
                 },
-                min_date: { 
+                min_date: {
                   type: 'string',
                   description: 'Minimum date (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss or ISO-8601 duration)'
                 },
-                max_date: { 
+                max_date: {
                   type: 'string',
                   description: 'Maximum date (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss or ISO-8601 duration)'
                 },
-                order: { 
+                order: {
                   type: 'integer',
                   minimum: 1,
                   description: 'Sort order (positive integer)'
                 },
-                format: { 
-                  type: 'string', 
+                format: {
+                  type: 'string',
                   enum: ['json', 'csv'],
                   description: 'Response format'
                 },
@@ -236,24 +236,24 @@ export class APMCPServer {
             inputSchema: {
               type: 'object',
               properties: {
-                rss_id: { 
+                rss_id: {
                   type: 'integer',
                   minimum: 1,
                   description: 'RSS feed ID (positive integer)'
                 },
-                include: { 
-                  type: 'array', 
+                include: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Fields to include in response'
                 },
-                exclude: { 
-                  type: 'array', 
+                exclude: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Fields to exclude from response'
                 },
-                page_size: { 
-                  type: 'integer', 
-                  minimum: 1, 
+                page_size: {
+                  type: 'integer',
+                  minimum: 1,
                   maximum: 100,
                   description: 'Number of items per page (1-100)'
                 },
@@ -267,7 +267,7 @@ export class APMCPServer {
             inputSchema: {
               type: 'object',
               properties: {
-                name: { 
+                name: {
                   type: 'string',
                   minLength: 1,
                   maxLength: 20,
@@ -276,7 +276,7 @@ export class APMCPServer {
                 },
                 description: { type: 'string', description: 'Monitor description' },
                 playbook: { type: 'string', description: 'Instructions for when monitor triggers' },
-                repeatAlerts: { 
+                repeatAlerts: {
                   type: 'string',
                   pattern: '^(0|PT\\d*[MH])$',
                   description: 'Repeat interval in ISO-8601 duration format (PT10M, PT2H) or "0" to disable'
@@ -292,7 +292,7 @@ export class APMCPServer {
                       channelDestinations: {
                         type: 'array',
                         minItems: 1,
-                        items: { 
+                        items: {
                           type: 'string',
                           format: 'email',
                           description: 'Email address for notifications'
@@ -315,7 +315,7 @@ export class APMCPServer {
                       criteria: {
                         type: 'object',
                         properties: {
-                          idleTime: { 
+                          idleTime: {
                             type: 'string',
                             pattern: '^PT\\d*[MH]$',
                             description: 'Idle time in ISO-8601 duration format (PT2M to PT12H)'
@@ -345,7 +345,7 @@ export class APMCPServer {
             inputSchema: {
               type: 'object',
               properties: {
-                monitor_id: { 
+                monitor_id: {
                   type: 'string',
                   minLength: 1,
                   description: 'Monitor ID or name'
@@ -360,12 +360,12 @@ export class APMCPServer {
             inputSchema: {
               type: 'object',
               properties: {
-                monitor_id: { 
+                monitor_id: {
                   type: 'string',
                   minLength: 1,
                   description: 'Monitor ID or name'
                 },
-                name: { 
+                name: {
                   type: 'string',
                   minLength: 1,
                   maxLength: 20,
@@ -374,7 +374,7 @@ export class APMCPServer {
                 },
                 description: { type: 'string', description: 'Monitor description' },
                 playbook: { type: 'string', description: 'Instructions for when monitor triggers' },
-                repeatAlerts: { 
+                repeatAlerts: {
                   type: 'string',
                   pattern: '^(0|PT\\d*[MH])$',
                   description: 'Repeat interval in ISO-8601 duration format (PT10M, PT2H) or "0" to disable'
@@ -390,7 +390,7 @@ export class APMCPServer {
                       channelDestinations: {
                         type: 'array',
                         minItems: 1,
-                        items: { 
+                        items: {
                           type: 'string',
                           format: 'email',
                           description: 'Email address for notifications'
@@ -408,8 +408,8 @@ export class APMCPServer {
                   items: {
                     type: 'object',
                     properties: {
-                      type: { 
-                        type: 'string', 
+                      type: {
+                        type: 'string',
                         enum: ['idleFeed', 'quality'],
                         description: 'Condition type'
                       },
@@ -417,7 +417,7 @@ export class APMCPServer {
                       criteria: {
                         type: 'object',
                         properties: {
-                          idleTime: { 
+                          idleTime: {
                             type: 'string',
                             pattern: '^PT\\d*[MH]$',
                             description: 'Idle time in ISO-8601 duration format (PT2M to PT12H)'
@@ -439,7 +439,7 @@ export class APMCPServer {
             inputSchema: {
               type: 'object',
               properties: {
-                monitor_id: { 
+                monitor_id: {
                   type: 'string',
                   minLength: 1,
                   description: 'Monitor ID or name'
@@ -454,16 +454,16 @@ export class APMCPServer {
             inputSchema: {
               type: 'object',
               properties: {
-                monitor_id: { 
+                monitor_id: {
                   type: 'string',
                   minLength: 1,
                   description: 'Monitor ID or name'
                 },
-                show_detail: { 
-                  type: 'boolean', 
-                  description: 'Show detailed information' 
+                show_detail: {
+                  type: 'boolean',
+                  description: 'Show detailed information'
                 },
-                agentid: { 
+                agentid: {
                   type: 'string',
                   description: 'Agent ID filter'
                 },
@@ -477,32 +477,32 @@ export class APMCPServer {
             inputSchema: {
               type: 'object',
               properties: {
-                monitor_id: { 
+                monitor_id: {
                   type: 'string',
                   minLength: 1,
                   description: 'Monitor ID or name'
                 },
-                show_detail: { 
-                  type: 'boolean', 
-                  description: 'Show detailed information' 
+                show_detail: {
+                  type: 'boolean',
+                  description: 'Show detailed information'
                 },
-                agentid: { 
+                agentid: {
                   type: 'string',
                   description: 'Agent ID filter'
                 },
-                min_date: { 
+                min_date: {
                   type: 'string',
                   description: 'Minimum date filter'
                 },
-                max_date: { 
+                max_date: {
                   type: 'string',
                   description: 'Maximum date filter'
                 },
-                page: { 
-                  type: 'string', 
-                  description: 'Page number (as string)' 
+                page: {
+                  type: 'string',
+                  description: 'Page number (as string)'
                 },
-                page_size: { 
+                page_size: {
                   type: 'integer',
                   minimum: 1,
                   maximum: 100,
@@ -526,13 +526,13 @@ export class APMCPServer {
             inputSchema: {
               type: 'object',
               properties: {
-                format: { 
-                  type: 'string', 
+                format: {
+                  type: 'string',
                   enum: ['json', 'csv'],
                   description: 'Response format'
                 },
-                include: { 
-                  type: 'array', 
+                include: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Fields to include in response'
                 },
@@ -545,27 +545,27 @@ export class APMCPServer {
             inputSchema: {
               type: 'object',
               properties: {
-                consumer_id: { 
-                  type: 'string', 
+                consumer_id: {
+                  type: 'string',
                   description: 'A user defined identifier for the consumer of this feed. Each unique consumer ID will receive every item once.'
                 },
-                queue: { 
-                  type: 'string', 
+                queue: {
+                  type: 'string',
                   description: 'The ID of the desired queue'
                 },
-                include: { 
-                  type: 'array', 
+                include: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Fields to include in response'
                 },
-                exclude: { 
-                  type: 'array', 
+                exclude: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Fields to exclude from response'
                 },
-                page_size: { 
-                  type: 'integer', 
-                  minimum: 1, 
+                page_size: {
+                  type: 'integer',
+                  minimum: 1,
                   maximum: 100,
                   description: 'Number of items per page (1-100)'
                 },
@@ -581,8 +581,8 @@ export class APMCPServer {
               type: 'object',
               properties: {
                 query: { type: 'string', description: 'Base text query' },
-                mediaType: { 
-                  type: 'string', 
+                mediaType: {
+                  type: 'string',
                   enum: ['text', 'picture', 'graphic', 'audio', 'video'],
                   description: 'Media type filter'
                 },
@@ -594,13 +594,13 @@ export class APMCPServer {
                   },
                   description: 'Date range filter'
                 },
-                subjects: { 
-                  type: 'array', 
+                subjects: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Subject/topic filters'
                 },
-                locations: { 
-                  type: 'array', 
+                locations: {
+                  type: 'array',
                   items: { type: 'string' },
                   description: 'Location/place filters'
                 },
@@ -613,13 +613,13 @@ export class APMCPServer {
             inputSchema: {
               type: 'object',
               properties: {
-                natural_query: { 
-                  type: 'string', 
+                natural_query: {
+                  type: 'string',
                   description: 'Natural language search intent (e.g., "photos of breaking news today")',
                   maxLength: 500
                 },
-                suggest_filters: { 
-                  type: 'boolean', 
+                suggest_filters: {
+                  type: 'boolean',
                   default: true,
                   description: 'Whether to suggest additional filters and improvements'
                 },
@@ -628,7 +628,7 @@ export class APMCPServer {
                   properties: {
                     preferred_types: {
                       type: 'array',
-                      items: { 
+                      items: {
                         type: 'string',
                         enum: ['text', 'picture', 'graphic', 'audio', 'video']
                       },
@@ -676,7 +676,7 @@ export class APMCPServer {
                 },
                 content_types: {
                   type: 'array',
-                  items: { 
+                  items: {
                     type: 'string',
                     enum: ['text', 'picture', 'graphic', 'audio', 'video']
                   },
@@ -723,7 +723,7 @@ export class APMCPServer {
                 },
                 content_types: {
                   type: 'array',
-                  items: { 
+                  items: {
                     type: 'string',
                     enum: ['text', 'picture', 'graphic', 'audio', 'video']
                   },
@@ -761,6 +761,126 @@ export class APMCPServer {
               },
             },
           },
+          {
+            name: 'search_content_all',
+            description: 'Search AP content with automatic pagination to retrieve all matching results efficiently',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                q: { type: 'string', description: 'Search query string' },
+                include: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Fields to include in response'
+                },
+                exclude: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Fields to exclude from response'
+                },
+                sort: { type: 'string', description: 'Sort order' },
+                page_size: {
+                  type: 'integer',
+                  minimum: 1,
+                  maximum: 100,
+                  description: 'Number of items per page (1-100)'
+                },
+                max_results: {
+                  type: 'integer',
+                  minimum: 1,
+                  maximum: 2000,
+                  default: 500,
+                  description: 'Maximum total results to retrieve (1-2000)'
+                },
+                progress_updates: {
+                  type: 'boolean',
+                  default: false,
+                  description: 'Whether to show progress during pagination'
+                },
+                deduplicate: {
+                  type: 'boolean',
+                  default: true,
+                  description: 'Remove duplicate items across pages'
+                },
+                pricing: { type: 'boolean', description: 'Include pricing information' },
+                in_my_plan: { type: 'boolean', description: 'Only show content in your plan' },
+                session_label: { type: 'string', description: 'Session label for tracking' },
+              },
+            },
+          },
+          {
+            name: 'get_content_bulk',
+            description: 'Retrieve multiple content items by IDs efficiently with batch processing and error handling',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                item_ids: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  minItems: 1,
+                  maxItems: 50,
+                  description: 'Array of content item IDs to retrieve (1-50 items)'
+                },
+                include: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Fields to include in response'
+                },
+                exclude: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Fields to exclude from response'
+                },
+                fail_on_missing: {
+                  type: 'boolean',
+                  default: false,
+                  description: 'Whether to fail if any items are missing'
+                },
+                batch_size: {
+                  type: 'integer',
+                  minimum: 1,
+                  maximum: 20,
+                  default: 10,
+                  description: 'Items processed per batch (1-20)'
+                }
+              },
+              required: ['item_ids'],
+            },
+          },
+          {
+            name: 'get_trending_subjects',
+            description: 'Quick discovery of trending subjects without full content analysis for rapid topic insights',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                timeframe: {
+                  type: 'string',
+                  enum: ['hour', 'day', 'week'],
+                  default: 'day',
+                  description: 'Time period for trend analysis'
+                },
+                max_subjects: {
+                  type: 'integer',
+                  minimum: 1,
+                  maximum: 100,
+                  default: 20,
+                  description: 'Maximum subjects to return (1-100)'
+                },
+                min_frequency: {
+                  type: 'integer',
+                  minimum: 1,
+                  maximum: 50,
+                  default: 2,
+                  description: 'Minimum occurrences to be considered trending'
+                },
+                subject_types: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Filter by specific subject types'
+                }
+              },
+            },
+          },
         ],
       };
     });
@@ -773,70 +893,79 @@ export class APMCPServer {
         switch (name) {
           case 'search_content':
             return await this.handleSearchContent(args);
-          
+
           case 'get_content_item':
             return await this.handleGetContentItem(args);
-          
+
           case 'get_content_feed':
             return await this.handleGetContentFeed(args);
-          
+
           case 'get_account_info':
             return await this.handleGetAccountInfo(args);
-          
+
           case 'get_account_plans':
             return await this.handleGetAccountPlans(args);
-          
+
           case 'get_account_downloads':
             return await this.handleGetAccountDownloads(args);
-          
+
           case 'get_rss_feeds':
             return await this.handleGetRSSFeeds(args);
-          
+
           case 'get_rss_feed':
             return await this.handleGetRSSFeed(args);
-          
+
           case 'create_monitor':
             return await this.handleCreateMonitor(args);
-          
+
           case 'list_monitors':
             return await this.handleListMonitors(args);
-          
+
           case 'get_monitor':
             return await this.handleGetMonitor(args);
-          
+
           case 'update_monitor':
             return await this.handleUpdateMonitor(args);
-          
+
           case 'delete_monitor':
             return await this.handleDeleteMonitor(args);
-          
+
           case 'get_monitor_status':
             return await this.handleGetMonitorStatus(args);
-          
+
           case 'get_monitor_history':
             return await this.handleGetMonitorHistory(args);
-          
+
           case 'get_account_quotas':
             return await this.handleGetAccountQuotas(args);
-          
+
           case 'get_followed_topics':
             return await this.handleGetFollowedTopics(args);
-          
+
           case 'get_ondemand_content':
             return await this.handleGetOnDemandContent(args);
-          
+
           case 'build_search_query':
             return await this.handleBuildSearchQuery(args);
-          
+
           case 'optimize_search_query':
             return await this.handleOptimizeSearchQuery(args);
-          
+
           case 'analyze_content_trends':
             return await this.handleAnalyzeContentTrends(args);
-          
+
           case 'get_content_recommendations':
             return await this.handleGetContentRecommendations(args);
-          
+
+          case 'search_content_all':
+            return await this.handleSearchContentAll(args);
+
+          case 'get_content_bulk':
+            return await this.handleGetContentBulk(args);
+
+          case 'get_trending_subjects':
+            return await this.handleGetTrendingSubjects(args);
+
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -849,7 +978,7 @@ export class APMCPServer {
           const mcpErrorCode = this.getMcpErrorCode(error);
           throw new McpError(mcpErrorCode, error.message, error.toJSON());
         }
-        
+
         // Handle other errors
         const handledError = ErrorHandler.handleError(error);
         throw new McpError(ErrorCode.InternalError, handledError.message, handledError.toJSON());
@@ -863,7 +992,7 @@ export class APMCPServer {
   private async handleSearchContent(args: any) {
     const params = args || {};
     const response = await this.contentService.searchContent(params);
-    
+
     return {
       content: [
         {
@@ -875,7 +1004,7 @@ export class APMCPServer {
               page_size: response.data.page_size,
               current_item_count: response.data.current_item_count,
             },
-            items: response.data.items.map(item => 
+            items: response.data.items.map(item =>
               ContentService.extractContentSummary(item)
             ),
             full_response: response,
@@ -890,13 +1019,13 @@ export class APMCPServer {
    */
   private async handleGetContentItem(args: any) {
     const { item_id, ...params } = args;
-    
+
     if (!item_id) {
       throw new APError('item_id is required', 'VALIDATION_ERROR', 400);
     }
 
     const response = await this.contentService.getContentItem(item_id, params);
-    
+
     return {
       content: [
         {
@@ -916,7 +1045,7 @@ export class APMCPServer {
   private async handleGetContentFeed(args: any) {
     const params = args || {};
     const response = await this.contentService.getContentFeed(params);
-    
+
     return {
       content: [
         {
@@ -929,7 +1058,7 @@ export class APMCPServer {
               current_item_count: response.data.current_item_count,
               updated: response.data.updated,
             },
-            items: response.data.items.map(item => 
+            items: response.data.items.map(item =>
               ContentService.extractContentSummary(item)
             ),
             full_response: response,
@@ -944,7 +1073,7 @@ export class APMCPServer {
    */
   private async handleGetAccountInfo(_args: any) {
     const response = await this.accountService.getAccountInfo();
-    
+
     return {
       content: [
         {
@@ -970,7 +1099,7 @@ export class APMCPServer {
     const params = args || {};
     const response = await this.accountService.getAccountPlans(params);
     const summary = AccountService.extractPlanSummary(response);
-    
+
     return {
       content: [
         {
@@ -991,7 +1120,7 @@ export class APMCPServer {
     const params = args || {};
     const response = await this.accountService.getAccountDownloads(params);
     const summary = AccountService.extractDownloadSummary(response);
-    
+
     return {
       content: [
         {
@@ -1010,7 +1139,7 @@ export class APMCPServer {
    */
   private async handleGetRSSFeeds(_args: any) {
     const response = await this.contentService.getRSSFeeds();
-    
+
     return {
       content: [
         {
@@ -1028,13 +1157,13 @@ export class APMCPServer {
    */
   private async handleGetRSSFeed(args: any) {
     const { rss_id, ...params } = args;
-    
+
     if (!rss_id) {
       throw new APError('rss_id is required', 'VALIDATION_ERROR', 400);
     }
 
     const response = await this.contentService.getRSSFeed(rss_id, params);
-    
+
     return {
       content: [
         {
@@ -1054,7 +1183,7 @@ export class APMCPServer {
   private async handleCreateMonitor(args: any) {
     const monitor = args;
     const response = await this.monitoringService.createMonitor(monitor);
-    
+
     return {
       content: [
         {
@@ -1078,7 +1207,7 @@ export class APMCPServer {
    */
   private async handleListMonitors(_args: any) {
     const response = await this.monitoringService.listMonitors();
-    
+
     return {
       content: [
         {
@@ -1097,7 +1226,7 @@ export class APMCPServer {
   private async handleGetMonitor(args: any) {
     const { monitor_id } = args;
     const response = await this.monitoringService.getMonitor(monitor_id);
-    
+
     return {
       content: [
         {
@@ -1121,7 +1250,7 @@ export class APMCPServer {
   private async handleUpdateMonitor(args: any) {
     const { monitor_id, ...monitorData } = args;
     const response = await this.monitoringService.updateMonitor(monitor_id, monitorData);
-    
+
     return {
       content: [
         {
@@ -1148,7 +1277,7 @@ export class APMCPServer {
   private async handleDeleteMonitor(args: any) {
     const { monitor_id } = args;
     const response = await this.monitoringService.deleteMonitor(monitor_id);
-    
+
     return {
       content: [
         {
@@ -1172,7 +1301,7 @@ export class APMCPServer {
   private async handleGetMonitorStatus(args: any) {
     const { monitor_id, ...options } = args;
     const response = await this.monitoringService.getMonitorStatus(monitor_id, options);
-    
+
     return {
       content: [
         {
@@ -1197,7 +1326,7 @@ export class APMCPServer {
   private async handleGetMonitorHistory(args: any) {
     const { monitor_id, ...options } = args;
     const response = await this.monitoringService.getMonitorHistory(monitor_id, options);
-    
+
     return {
       content: [
         {
@@ -1226,7 +1355,7 @@ export class APMCPServer {
   private async handleGetAccountQuotas(_args: any) {
     const response = await this.accountService.getAccountQuotas();
     const summary = AccountService.extractQuotaSummary(response);
-    
+
     return {
       content: [
         {
@@ -1246,7 +1375,7 @@ export class APMCPServer {
   private async handleGetFollowedTopics(args: any) {
     const options = args || {};
     const response = await this.accountService.getFollowedTopics(options);
-    
+
     return {
       content: [
         {
@@ -1270,7 +1399,7 @@ export class APMCPServer {
   private async handleGetOnDemandContent(args: any) {
     const params = args || {};
     const response = await this.contentService.getOnDemandContent(params);
-    
+
     return {
       content: [
         {
@@ -1285,7 +1414,7 @@ export class APMCPServer {
               consumer_id: params.consumer_id || 'default',
               queue: params.queue || 'default',
             },
-            items: response.data.items.map(item => 
+            items: response.data.items.map(item =>
               ContentService.extractContentSummary(item)
             ),
             full_response: response,
@@ -1301,7 +1430,7 @@ export class APMCPServer {
   private async handleBuildSearchQuery(args: any) {
     const filters = args || {};
     const query = ContentService.buildSearchQuery(filters);
-    
+
     return {
       content: [
         {
@@ -1323,17 +1452,17 @@ export class APMCPServer {
   }
 
   /**
-   * Handle optimize search query tool (Phase 2 Enhancement)
+   * Handle optimize search query tool
    */
   private async handleOptimizeSearchQuery(args: any) {
     const params = args || {};
-    
+
     if (!params.natural_query) {
       throw new APError('natural_query is required', 'VALIDATION_ERROR', 400);
     }
 
     const response = await this.contentService.optimizeSearchQuery(params);
-    
+
     return {
       content: [
         {
@@ -1356,12 +1485,12 @@ export class APMCPServer {
   }
 
   /**
-   * Handle analyze content trends tool (Phase 2 Enhancement)
+   * Handle analyze content trends tool
    */
   private async handleAnalyzeContentTrends(args: any) {
     const params = args || {};
     const response = await this.contentService.analyzeContentTrends(params);
-    
+
     return {
       content: [
         {
@@ -1385,12 +1514,12 @@ export class APMCPServer {
   }
 
   /**
-   * Handle get content recommendations tool (Phase 2 Enhancement)
+   * Handle get content recommendations tool
    */
   private async handleGetContentRecommendations(args: any) {
     const params = args || {};
     const response = await this.contentService.getContentRecommendations(params);
-    
+
     return {
       content: [
         {
@@ -1411,6 +1540,144 @@ export class APMCPServer {
                 relevance_score: response.recommendations[0].relevance_score,
               } : null,
             },
+            full_response: response,
+          }, null, 2),
+        },
+      ],
+    };
+  }
+
+  /**
+   * Handle search content all tool
+   */
+  private async handleSearchContentAll(args: any) {
+    const params = args || {};
+    const response = await this.contentService.searchContentAll(params);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            summary: {
+              operation: response.summary.operation,
+              total_results: response.summary.total_results,
+              pages_fetched: response.summary.pages_fetched,
+              processing_time_ms: response.summary.processing_time_ms,
+              success_rate: response.summary.success_rate,
+              cache_performance: {
+                hits: response.summary.cache_hits,
+                enabled: true,
+              },
+              deduplicated_items: response.summary.deduplicated_count,
+              pagination: {
+                total_pages: response.full_response.pagination_info.total_pages,
+                max_results_reached: response.full_response.pagination_info.max_results_reached,
+              },
+            },
+            items: response.full_response.items.map(item =>
+              ContentService.extractContentSummary(item)
+            ),
+            full_response: response,
+          }, null, 2),
+        },
+      ],
+    };
+  }
+
+  /**
+   * Handle get content bulk tool
+   */
+  private async handleGetContentBulk(args: any) {
+    const { item_ids, ...params } = args;
+
+    if (!item_ids || !Array.isArray(item_ids) || item_ids.length === 0) {
+      throw new APError('item_ids is required and must be a non-empty array', 'VALIDATION_ERROR', 400);
+    }
+
+    const bulkParams = { item_ids, ...params };
+    const response = await this.contentService.getContentBulk(bulkParams);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            summary: {
+              operation: response.summary.operation,
+              total_requested: item_ids.length,
+              successful_retrievals: response.summary.successful_retrievals,
+              failed_retrievals: response.summary.failed_retrievals,
+              success_rate: response.summary.success_rate,
+              processing_time_ms: response.summary.processing_time_ms,
+              batch_processing: {
+                batch_count: response.summary.batch_count,
+                cache_performance: {
+                  enabled: true,
+                },
+              },
+              missing_items: response.full_response.missing_item_ids.length,
+            },
+            successful_items: response.full_response.items
+              .filter(item => item.success)
+              .map(item => ({
+                content_id: item.content_id,
+                summary: item.content ? ContentService.extractContentSummary(item.content) : null,
+              })),
+            failed_items: response.full_response.items
+              .filter(item => !item.success)
+              .map(item => ({
+                content_id: item.content_id,
+                error: item.error,
+              })),
+            full_response: response,
+          }, null, 2),
+        },
+      ],
+    };
+  }
+
+  /**
+   * Handle get trending subjects tool
+   */
+  private async handleGetTrendingSubjects(args: any) {
+    const params = args || {};
+    const response = await this.contentService.getTrendingSubjects(params);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            summary: {
+              operation: response.summary.operation,
+              timeframe: response.summary.timeframe,
+              total_subjects: response.summary.total_results,
+              processing_time_ms: response.summary.processing_time_ms,
+              success_rate: response.summary.success_rate,
+              cache_performance: {
+                hits: response.summary.cache_hits || 0,
+                enabled: true,
+              },
+              analysis_metrics: {
+                content_analyzed: response.full_response.content_analyzed,
+                time_period: {
+                  start: response.full_response.analysis_period.start,
+                  end: response.full_response.analysis_period.end,
+                },
+              },
+              top_subject: response.full_response.items[0] ? {
+                name: response.full_response.items[0].subject_name,
+                frequency: response.full_response.items[0].frequency,
+                trend_score: response.full_response.items[0].trend_score,
+              } : null,
+            },
+            trending_subjects: response.full_response.items.map(subject => ({
+              name: subject.subject_name,
+              frequency: subject.frequency,
+              trend_score: subject.trend_score,
+              sample_content_count: subject.sample_content_ids.length,
+            })),
             full_response: response,
           }, null, 2),
         },
@@ -1493,7 +1760,7 @@ export class APMCPServer {
 
     console.error('AP MCP Server starting...');
     console.error('Configuration:', JSON.stringify(this.getConfigSummary(), null, 2));
-    
+
     // Connect using stdio transport
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
@@ -1513,7 +1780,7 @@ export class APMCPServer {
   getRegisteredTools(): string[] {
     const tools = [
       'search_content',
-      'get_content_item', 
+      'get_content_item',
       'get_content_feed',
       'get_account_info',
       'get_account_plans',
@@ -1533,7 +1800,10 @@ export class APMCPServer {
       'build_search_query',
       'optimize_search_query',
       'analyze_content_trends',
-      'get_content_recommendations'
+      'get_content_recommendations',
+      'search_content_all',
+      'get_content_bulk',
+      'get_trending_subjects'
     ];
     return tools;
   }
@@ -1546,10 +1816,10 @@ export class APMCPServer {
     if (!this.server) {
       throw new Error('MCP server not initialized');
     }
-    
+
     // Check that all required handlers are set
     // This is a basic validation - in a real scenario we'd check internal server state
-    
+
     console.log('MCP server appears to be properly configured');
   }
 }

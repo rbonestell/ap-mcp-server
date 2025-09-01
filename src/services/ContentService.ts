@@ -1,23 +1,32 @@
+import { APAPIError, APError, APValidationError } from '../errors/APError.js';
 import { APHttpClient } from '../http/APHttpClient.js';
 import {
-  ContentResponse,
-  SearchResponse,
-  FeedResponse,
-  RSSResponse,
-  SearchParams,
-  FeedParams,
-  ItemParams,
-  RSSParams,
-  OptimizeQueryParams,
-  OptimizeQueryResponse,
-  ContentTrendsParams,
-  ContentTrendsResponse,
-  ContentRecommendationsParams,
-  ContentRecommendationsResponse,
-  TrendingTopic,
-  ContentRecommendation,
+	BulkContentParams,
+	BulkContentResponse,
+	BulkContentResult,
+	ContentRecommendation,
+	ContentRecommendationsParams,
+	ContentRecommendationsResponse,
+	ContentResponse,
+	ContentTrendsParams,
+	ContentTrendsResponse,
+	FeedParams,
+	FeedResponse,
+	ItemParams,
+	OptimizeQueryParams,
+	OptimizeQueryResponse,
+	RSSParams,
+	RSSResponse,
+	SearchAllParams,
+	SearchAllResponse,
+	SearchParams,
+	SearchResponse,
+	TrendingSubject,
+	TrendingSubjectsParams,
+	TrendingSubjectsResponse,
+	TrendingTopic
 } from '../types/api.types.js';
-import { APValidationError, APError } from '../errors/APError.js';
+import { CacheTTL, globalCache, SimpleCache } from '../utils/Cache.js';
 
 /**
  * Service for AP Content API operations
@@ -241,7 +250,18 @@ export class ContentService {
    * Handle service errors with context
    */
   private handleServiceError(operation: string, error: unknown, context?: any): APError {
-    if (error instanceof APError) {
+    if (error instanceof APValidationError) {
+      // Preserve APValidationError type - these should pass through unchanged
+      return error;
+    } else if (error instanceof APAPIError) {
+      // Preserve APAPIError type with additional context
+      const newDetails = {
+        ...error.details,
+        operation,
+        context,
+      };
+      return new APAPIError(error.message, error.statusCode || 500, error.code, newDetails, error.originalError);
+    } else if (error instanceof APError) {
       // Add operation context to existing AP errors
       const newDetails = {
         ...error.details,
@@ -315,7 +335,7 @@ export class ContentService {
     subjects?: string[];
   } {
     const item = contentResult.item || contentResult;
-    
+
     return {
       id: item.altids?.itemid || item.uri,
       title: item.title,
@@ -329,10 +349,6 @@ export class ContentService {
   }
 
   /**
-   * Phase 2: Enhanced Query Intelligence Methods
-   */
-
-  /**
    * Optimize a natural language search query for AP content API
    * @param params Natural language query optimization parameters
    * @returns Optimized query with suggestions and transformations
@@ -343,10 +359,10 @@ export class ContentService {
     try {
       // Apply NLP patterns to transform natural language to structured query
       const nlpResult = this.applyNLPPatterns(params.natural_query);
-      
+
       // Apply content preferences if provided (but avoid duplicating filters already applied by NLP)
       const preferenceFilters = this.applyContentPreferences(params.content_preferences, nlpResult);
-      
+
       // Combine base query with NLP transformations and preferences
       const queryParts = [
         nlpResult.baseQuery,
@@ -356,11 +372,11 @@ export class ContentService {
 
       // Optimize for specific criteria
       const optimizedParts = this.optimizeQueryForCriteria(queryParts, params.optimize_for || 'relevance');
-      
+
       const optimizedQuery = optimizedParts.join(' AND ');
-      
+
       // Generate suggestions if requested
-      const suggestions = params.suggest_filters !== false 
+      const suggestions = params.suggest_filters !== false
         ? this.generateQuerySuggestions(params.natural_query, nlpResult)
         : undefined;
 
@@ -396,26 +412,26 @@ export class ContentService {
     try {
       const timeframe = params.timeframe || 'day';
       const maxTopics = Math.min(params.max_topics || 10, 50);
-      
+
       // Calculate time range for analysis
       const timeRange = this.calculateTimeRange(timeframe);
-      
+
       // Build search query for trending analysis
       const searchQuery = this.buildTrendingSearchQuery(params, timeRange);
-      
+
       // Perform multiple searches to gather trend data
       const trendingData = await this.gatherTrendingData(
-        searchQuery, 
+        searchQuery,
         params.content_types,
         maxTopics
       );
 
       // Analyze trends and calculate metrics
       const analyzedTrends = this.analyzeTrendingTopics(trendingData, timeframe);
-      
+
       // Extract geographic distribution if location data available
       const geoDistribution = this.extractGeographicTrends(trendingData);
-      
+
       return {
         timeframe,
         analysis_period: {
@@ -462,10 +478,10 @@ export class ContentService {
 
       // Build recommendation search strategy
       const searchStrategy = this.buildRecommendationStrategy(params, seedAnalysis);
-      
+
       // Execute multiple targeted searches
       const candidateContent = await this.searchForRecommendations(searchStrategy, params);
-      
+
       // Score and rank recommendations
       const scoredRecommendations = this.scoreContentRecommendations(
         candidateContent,
@@ -473,7 +489,7 @@ export class ContentService {
         seedAnalysis,
         similarityThreshold
       );
-      
+
       // Filter out excluded content
       const filteredRecommendations = this.filterExcludedContent(
         scoredRecommendations,
@@ -665,7 +681,7 @@ export class ContentService {
     const filters: string[] = [];
 
     // Only add type filters if NLP didn't already detect content types
-    if (preferences.preferred_types && preferences.preferred_types.length > 0 && 
+    if (preferences.preferred_types && preferences.preferred_types.length > 0 &&
         (!nlpResult || nlpResult.contentTypeFilters.length === 0)) {
       if (preferences.preferred_types.length === 1) {
         filters.push(`type:${preferences.preferred_types[0]}`);
@@ -814,10 +830,10 @@ export class ContentService {
     };
 
     const searchResponse = await this.searchContent(searchParams);
-    
+
     // Extract subjects and their frequencies
     const subjectCounts = new Map<string, { count: number; codes: Set<string>; content_ids: string[]; locations: Set<string> }>();
-    
+
     for (const result of searchResponse.data.items) {
       const item = result.item;
       if (item.subject) {
@@ -831,12 +847,12 @@ export class ContentService {
               locations: new Set(),
             });
           }
-          
+
           const subjectData = subjectCounts.get(key)!;
           subjectData.count++;
           subjectData.codes.add(subject.code);
           subjectData.content_ids.push(item.altids?.itemid || item.uri);
-          
+
           // Add location data if available
           if (item.place) {
             for (const place of item.place) {
@@ -856,16 +872,16 @@ export class ContentService {
 
   private analyzeTrendingTopics(trendingData: any, timeframe: string): TrendingTopic[] {
     const trends: TrendingTopic[] = [];
-    
+
     for (const [subjectName, data] of trendingData.subjectCounts) {
       // Simple trend analysis - in a real implementation, this would compare
       // with historical data to determine trend direction
-      const trendDirection: 'rising' | 'stable' | 'declining' = 
-        data.count > 5 ? 'rising' : 
+      const trendDirection: 'rising' | 'stable' | 'declining' =
+        data.count > 5 ? 'rising' :
         data.count > 2 ? 'stable' : 'declining';
-      
+
       const trendStrength = Math.min(data.count / 10, 1.0); // Normalize to 0-1
-      
+
       trends.push({
         subject_name: subjectName,
         subject_code: Array.from(data.codes)[0], // Use first code
@@ -873,25 +889,25 @@ export class ContentService {
         trend_direction: trendDirection,
         trend_strength: trendStrength,
         sample_content_ids: data.content_ids.slice(0, 3), // Up to 3 sample IDs
-        geographic_distribution: data.locations.size > 0 
+        geographic_distribution: data.locations.size > 0
           ? Object.fromEntries(Array.from(data.locations).map(loc => [loc, 1]))
           : undefined,
       });
     }
-    
+
     // Sort by frequency descending
     return trends.sort((a, b) => b.frequency - a.frequency);
   }
 
   private extractGeographicTrends(trendingData: any): string[] {
     const locationCounts = new Map<string, number>();
-    
+
     for (const [_, data] of trendingData.subjectCounts) {
       for (const location of data.locations) {
         locationCounts.set(location, (locationCounts.get(location) || 0) + 1);
       }
     }
-    
+
     return Array.from(locationCounts.entries())
       .sort((a, b) => b[1] - a[1])
       .map(([location]) => location);
@@ -902,27 +918,27 @@ export class ContentService {
     const commonSubjects = new Set<string>();
     const commonLocations = new Set<string>();
     const contentTypes = new Map<string, number>();
-    
+
     // Analyze each seed content item
     for (const contentId of contentIds.slice(0, 5)) { // Limit to 5 for performance
       try {
         const content = await this.getContentItem(contentId);
         const item = content.data.item;
-        
+
         // Collect subjects
         if (item.subject) {
           for (const subject of item.subject) {
             commonSubjects.add(subject.name);
           }
         }
-        
+
         // Collect locations
         if (item.place) {
           for (const place of item.place) {
             commonLocations.add(place.name);
           }
         }
-        
+
         // Count content types
         contentTypes.set(item.type, (contentTypes.get(item.type) || 0) + 1);
       } catch (error) {
@@ -930,7 +946,7 @@ export class ContentService {
         continue;
       }
     }
-    
+
     return {
       common_subjects: Array.from(commonSubjects).slice(0, 10),
       common_locations: Array.from(commonLocations).slice(0, 5),
@@ -941,7 +957,7 @@ export class ContentService {
   private buildRecommendationStrategy(params: ContentRecommendationsParams, seedAnalysis?: any): { description: string; filtersApplied: string[] } {
     const filters: string[] = [];
     let description = 'Content recommendation';
-    
+
     // Use seed analysis for recommendations
     if (seedAnalysis) {
       if (seedAnalysis.common_subjects.length > 0) {
@@ -953,28 +969,28 @@ export class ContentService {
         filters.push('location-based similarity');
       }
     }
-    
+
     // Apply explicit parameters
     if (params.subjects && params.subjects.length > 0) {
       description += ' with specified subjects';
       filters.push('explicit subject filters');
     }
-    
+
     if (params.content_types && params.content_types.length > 0) {
       description += ' filtered by content type';
       filters.push('content type filters');
     }
-    
+
     if (params.location_preference) {
       description += ' with location preference';
       filters.push('location preference');
     }
-    
+
     if (params.recency_preference && params.recency_preference !== 'any') {
       description += ` prioritizing ${params.recency_preference} content`;
       filters.push('recency preference');
     }
-    
+
     return { description, filtersApplied: filters };
   }
 
@@ -983,15 +999,15 @@ export class ContentService {
       page_size: 50, // Get more candidates for better scoring
       include: ['subject', 'place', 'urgency', 'firstcreated'],
     };
-    
+
     const queryParts: string[] = [];
-    
+
     // Add subject-based search if specified
     if (params.subjects && params.subjects.length > 0) {
       const subjectQuery = params.subjects.map(subject => `subject.name:"${subject}"`).join(' OR ');
       queryParts.push(`(${subjectQuery})`);
     }
-    
+
     // Add content type filter
     if (params.content_types && params.content_types.length > 0) {
       if (params.content_types.length === 1) {
@@ -1001,12 +1017,12 @@ export class ContentService {
         queryParts.push(`(${typeQuery})`);
       }
     }
-    
+
     // Add location preference
     if (params.location_preference) {
       queryParts.push(`place.name:"${params.location_preference}"`);
     }
-    
+
     // Add recency filter
     if (params.recency_preference) {
       switch (params.recency_preference) {
@@ -1018,32 +1034,32 @@ export class ContentService {
           break;
       }
     }
-    
+
     if (queryParts.length > 0) {
       searchParams.q = queryParts.join(' AND ');
     }
-    
+
     const searchResponse = await this.searchContent(searchParams);
     return searchResponse.data.items;
   }
 
   private scoreContentRecommendations(
-    candidates: any[], 
-    params: ContentRecommendationsParams, 
-    seedAnalysis?: any, 
+    candidates: any[],
+    params: ContentRecommendationsParams,
+    seedAnalysis?: any,
     threshold: number = 0.3
   ): ContentRecommendation[] {
     const recommendations: ContentRecommendation[] = [];
-    
+
     for (const candidate of candidates) {
       const item = candidate.item;
       const contentSummary = ContentService.extractContentSummary(candidate);
-      
+
       // Calculate relevance score based on multiple factors
       let relevanceScore = 0;
       const similarityFactors: ContentRecommendation['similarity_factors'] = {};
       let recommendationReason = '';
-      
+
       // Subject overlap scoring
       if (seedAnalysis?.common_subjects) {
         const itemSubjects = item.subject?.map((s: any) => s.name) || [];
@@ -1055,7 +1071,7 @@ export class ContentService {
           recommendationReason += `Shares ${subjectOverlap} subjects with seed content. `;
         }
       }
-      
+
       // Location overlap scoring
       if (seedAnalysis?.common_locations) {
         const itemLocations = item.place?.map((p: any) => p.name) || [];
@@ -1067,7 +1083,7 @@ export class ContentService {
           recommendationReason += `Same location as seed content. `;
         }
       }
-      
+
       // Content type matching
       if (params.content_types) {
         if (params.content_types.includes(item.type)) {
@@ -1076,7 +1092,7 @@ export class ContentService {
           recommendationReason += `Matches preferred content type. `;
         }
       }
-      
+
       // Temporal relevance (recency boost)
       if (item.firstcreated) {
         const contentDate = new Date(item.firstcreated);
@@ -1085,13 +1101,13 @@ export class ContentService {
         similarityFactors.temporal_relevance = temporalRelevance;
         relevanceScore += temporalRelevance * 0.2;
       }
-      
+
       // Urgency boost
       if (item.urgency && item.urgency >= 3) {
         relevanceScore += 0.1;
         recommendationReason += 'High urgency content. ';
       }
-      
+
       // Only include recommendations above threshold
       if (relevanceScore >= threshold) {
         recommendations.push({
@@ -1111,14 +1127,563 @@ export class ContentService {
         });
       }
     }
-    
+
     return recommendations;
   }
 
   private filterExcludedContent(recommendations: ContentRecommendation[], excludeIds: string[]): ContentRecommendation[] {
     if (excludeIds.length === 0) return recommendations;
-    
+
     const excludeSet = new Set(excludeIds);
     return recommendations.filter(rec => !excludeSet.has(rec.content_id));
+  }
+
+  /**
+   * Search for AP content with automatic pagination to get all results
+   * @param params Auto-pagination search parameters
+   * @returns All search results with performance metrics
+   */
+  async searchContentAll(params: SearchAllParams = {}): Promise<SearchAllResponse> {
+    const startTime = Date.now();
+    let cacheHits = 0;
+    const errors: any[] = [];
+
+    // Validate parameters
+    this.validateSearchAllParams(params);
+
+    const maxResults = Math.min(params.max_results || 500, 2000);
+    const progressUpdates = params.progress_updates || false;
+    const deduplicate = params.deduplicate !== false; // Default to true
+
+    try {
+      // Generate cache key for this search
+      const cacheKey = SimpleCache.generateKey('search_all', {
+        ...params,
+        max_results: maxResults,
+        deduplicate,
+      });
+
+      // Check cache first
+      const cachedResult = globalCache.get(cacheKey);
+      if (cachedResult) {
+        cacheHits = 1;
+        return {
+          ...cachedResult,
+          summary: {
+            ...cachedResult.summary,
+            cache_hits: 1,
+            processing_time_ms: Date.now() - startTime,
+          },
+        };
+      }
+
+      const allItems: any[] = [];
+      const seenIds = deduplicate ? new Set<string>() : null;
+      let currentPage = 1;
+      let totalPages = 1;
+      let pagesFetched = 0;
+      let hasMore = true;
+
+      // Start with the provided page size or default to 25
+      const pageSize = Math.min(params.page_size || 25, 100);
+
+      while (hasMore && allItems.length < maxResults) {
+        if (progressUpdates) {
+          console.log(`Fetching page ${currentPage}/${totalPages}...`);
+        }
+
+        try {
+          const searchParams: SearchParams = {
+            ...params,
+            page: currentPage.toString(),
+            page_size: Math.min(pageSize, maxResults - allItems.length),
+          };
+          delete (searchParams as any).max_results;
+          delete (searchParams as any).progress_updates;
+          delete (searchParams as any).deduplicate;
+
+          const response = await this.searchContent(searchParams);
+          pagesFetched++;
+
+          // Calculate total pages from first response
+          if (currentPage === 1) {
+            totalPages = Math.ceil(response.data.total_items / pageSize);
+          }
+
+          // Process items
+          for (const item of response.data.items) {
+            if (allItems.length >= maxResults) break;
+
+            const itemId = item.item?.altids?.itemid || item.item?.uri;
+            if (deduplicate && seenIds && itemId) {
+              if (seenIds.has(itemId)) {
+                continue; // Skip duplicate
+              }
+              seenIds.add(itemId);
+            }
+
+            allItems.push(item);
+          }
+
+          // Check if we have more pages
+          hasMore = response.data.current_item_count === pageSize &&
+                   allItems.length < maxResults &&
+                   currentPage < totalPages;
+
+          currentPage++;
+
+          // Rate limiting: small delay between requests
+          if (hasMore) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+
+        } catch (error) {
+          errors.push({
+            page: currentPage,
+            error: error instanceof Error ? error.message : String(error),
+          });
+
+          // Continue to next page on error
+          currentPage++;
+          hasMore = currentPage <= totalPages && allItems.length < maxResults;
+        }
+      }
+
+      const processingTime = Date.now() - startTime;
+      const successRate = pagesFetched > 0 ? (pagesFetched - errors.length) / pagesFetched : 1;
+      const deduplicatedCount = deduplicate && seenIds ?
+        (allItems.length + (seenIds.size - allItems.length)) : undefined;
+
+      const result: SearchAllResponse = {
+        summary: {
+          operation: 'search_content_all',
+          total_results: allItems.length,
+          pages_fetched: pagesFetched,
+          cache_hits: cacheHits,
+          processing_time_ms: processingTime,
+          success_rate: Math.round(successRate * 1000) / 1000,
+          deduplicated_count: deduplicatedCount,
+        },
+        full_response: {
+          items: allItems,
+          performance_stats: {
+            processing_time_ms: processingTime,
+            pages_fetched: pagesFetched,
+            items_processed: allItems.length,
+            cache_hits: cacheHits,
+            cache_misses: cacheHits === 0 ? 1 : 0,
+            success_rate: successRate,
+            errors: errors.length > 0 ? errors.map(e => e.error) : undefined,
+          },
+          pagination_info: {
+            total_pages: totalPages,
+            max_results_reached: allItems.length >= maxResults,
+            final_page_size: pageSize,
+          },
+          errors: errors.length > 0 ? errors : undefined,
+        },
+      };
+
+      // Cache successful results
+      if (errors.length === 0) {
+        globalCache.set(cacheKey, result, CacheTTL.SEARCH_RESULTS);
+      }
+
+      return result;
+
+    } catch (error) {
+      throw this.handleServiceError('searchContentAll', error, params);
+    }
+  }
+
+  /**
+   * Retrieve multiple content items by IDs efficiently with batch processing
+   * @param params Bulk content retrieval parameters
+   * @returns Bulk retrieval results with performance metrics
+   */
+  async getContentBulk(params: BulkContentParams): Promise<BulkContentResponse> {
+    const startTime = Date.now();
+    let cacheHits = 0;
+    const errors: any[] = [];
+
+    // Validate parameters
+    this.validateBulkContentParams(params);
+
+    const { item_ids, batch_size = 10, fail_on_missing = false } = params;
+    const maxBatchSize = Math.min(batch_size, 20);
+
+    try {
+      // Generate cache key
+      const cacheKey = SimpleCache.generateKey('bulk_content', {
+        item_ids: item_ids.sort(),
+        include: params.include,
+        exclude: params.exclude,
+        batch_size: maxBatchSize,
+      });
+
+      // Check cache first
+      const cachedResult = globalCache.get(cacheKey);
+      if (cachedResult) {
+        cacheHits = 1;
+        return {
+          ...cachedResult,
+          summary: {
+            ...cachedResult.summary,
+            cache_hits: 1,
+            processing_time_ms: Date.now() - startTime,
+          },
+        };
+      }
+
+      const results: BulkContentResult[] = [];
+      const missingIds: string[] = [];
+      let successCount = 0;
+      let failureCount = 0;
+
+      // Process items in batches
+      const batches = this.createBatches(item_ids, maxBatchSize);
+      let batchCount = 0;
+
+      for (const batch of batches) {
+        batchCount++;
+
+        // Process batch items in parallel (but limited concurrency)
+        const batchPromises = batch.map(async (itemId) => {
+          try {
+            const itemParams = {
+              include: params.include,
+              exclude: params.exclude,
+            };
+
+            const content = await this.getContentItem(itemId, itemParams);
+            successCount++;
+
+            return {
+              content_id: itemId,
+              success: true,
+              content: content.data,
+            } as BulkContentResult;
+
+          } catch (error) {
+            failureCount++;
+            const errorMessage = error instanceof Error ? error.message : String(error);
+
+            // Check if it's a 404 (not found) error
+            if (error instanceof APAPIError && error.statusCode === 404) {
+              missingIds.push(itemId);
+            } else if (error instanceof APError && error.statusCode === 404) {
+              missingIds.push(itemId);
+            }
+
+            errors.push({
+              item_id: itemId,
+              error: errorMessage,
+            });
+
+            return {
+              content_id: itemId,
+              success: false,
+              error: errorMessage,
+            } as BulkContentResult;
+          }
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+        results.push(...batchResults);
+
+        // Rate limiting between batches
+        if (batchCount < batches.length) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+
+        // Fail fast if requested and we have failures
+        if (fail_on_missing && missingIds.length > 0) {
+          throw new APValidationError(
+            `Missing content items: ${missingIds.join(', ')}`,
+            'item_ids',
+            { missing_ids: missingIds }
+          );
+        }
+      }
+
+      const processingTime = Date.now() - startTime;
+      const successRate = item_ids.length > 0 ? successCount / item_ids.length : 1;
+
+      const result: BulkContentResponse = {
+        summary: {
+          operation: 'get_content_bulk',
+          total_results: results.length,
+          successful_retrievals: successCount,
+          failed_retrievals: failureCount,
+          processing_time_ms: processingTime,
+          success_rate: Math.round(successRate * 1000) / 1000,
+          batch_count: batchCount,
+        },
+        full_response: {
+          items: results,
+          performance_stats: {
+            processing_time_ms: processingTime,
+            items_processed: results.length,
+            cache_hits: cacheHits,
+            cache_misses: cacheHits === 0 ? 1 : 0,
+            success_rate: successRate,
+            batch_count: batchCount,
+            errors: errors.length > 0 ? errors.map(e => e.error) : undefined,
+          },
+          missing_item_ids: missingIds,
+          errors: errors.length > 0 ? errors : undefined,
+        },
+      };
+
+      // Cache successful results (only if high success rate)
+      if (successRate >= 0.8) {
+        globalCache.set(cacheKey, result, CacheTTL.BULK_OPERATIONS);
+      }
+
+      return result;
+
+    } catch (error) {
+      throw this.handleServiceError('getContentBulk', error, params);
+    }
+  }
+
+  /**
+   * Get trending subjects quickly without full content analysis
+   * @param params Trending subjects parameters
+   * @returns Trending subjects with frequency data
+   */
+  async getTrendingSubjects(params: TrendingSubjectsParams = {}): Promise<TrendingSubjectsResponse> {
+    const startTime = Date.now();
+    let cacheHits = 0;
+
+    // Validate parameters
+    this.validateTrendingSubjectsParams(params);
+
+    const timeframe = params.timeframe || 'day';
+    const maxSubjects = Math.min(params.max_subjects || 20, 100);
+    const minFrequency = params.min_frequency || 2;
+
+    try {
+      // Generate cache key
+      const cacheKey = SimpleCache.generateKey('trending_subjects', {
+        timeframe,
+        max_subjects: maxSubjects,
+        min_frequency: minFrequency,
+        subject_types: params.subject_types,
+      });
+
+      // Check cache first (trending data changes frequently, so shorter TTL)
+      const cachedResult = globalCache.get(cacheKey);
+      if (cachedResult) {
+        cacheHits = 1;
+        return {
+          ...cachedResult,
+          summary: {
+            ...cachedResult.summary,
+            cache_hits: 1,
+            processing_time_ms: Date.now() - startTime,
+          },
+        };
+      }
+
+      // Calculate time range
+      const timeRange = this.calculateTimeRange(timeframe);
+
+      // Build optimized search query for trending analysis
+      const queryParts: string[] = [];
+      queryParts.push(`firstcreated:[${timeRange.start} TO ${timeRange.end}]`);
+
+      // Filter by subject types if provided
+      if (params.subject_types && params.subject_types.length > 0) {
+        const subjectTypeQuery = params.subject_types.map(type => `subject.name:"${type}"`).join(' OR ');
+        queryParts.push(`(${subjectTypeQuery})`);
+      }
+
+      const searchQuery = queryParts.join(' AND ');
+
+      // Perform optimized search focused on subject extraction
+      const searchParams: SearchParams = {
+        q: searchQuery,
+        page_size: 50, // Smaller page size for faster processing
+        include: ['subject', 'firstcreated', 'altids'], // Only essential fields
+      };
+
+      const searchResponse = await this.searchContent(searchParams);
+
+      // Extract and count subjects efficiently
+      const subjectCounts = new Map<string, {
+        count: number;
+        codes: Set<string>;
+        sample_ids: string[];
+      }>();
+
+      let contentAnalyzed = 0;
+      for (const result of searchResponse.data.items) {
+        const item = result.item;
+        contentAnalyzed++;
+
+        if (item.subject) {
+          for (const subject of item.subject) {
+            const subjectName = subject.name;
+            if (!subjectCounts.has(subjectName)) {
+              subjectCounts.set(subjectName, {
+                count: 0,
+                codes: new Set(),
+                sample_ids: [],
+              });
+            }
+
+            const subjectData = subjectCounts.get(subjectName)!;
+            subjectData.count++;
+            subjectData.codes.add(subject.code);
+
+            // Keep only first 3 sample IDs for performance
+            if (subjectData.sample_ids.length < 3) {
+              subjectData.sample_ids.push(item.altids?.itemid || item.uri);
+            }
+          }
+        }
+      }
+
+      // Convert to trending subjects and apply filters
+      const trendingSubjects: TrendingSubject[] = [];
+
+      for (const [subjectName, data] of subjectCounts.entries()) {
+        // Apply minimum frequency filter
+        if (data.count < minFrequency) continue;
+
+        // Calculate trend score (simple frequency-based for now)
+        const trendScore = Math.min(data.count / 10, 1.0);
+
+        trendingSubjects.push({
+          subject_name: subjectName,
+          subject_code: Array.from(data.codes)[0], // Use first code
+          frequency: data.count,
+          trend_score: Math.round(trendScore * 1000) / 1000,
+          sample_content_ids: data.sample_ids,
+        });
+      }
+
+      // Sort by frequency and limit results
+      const sortedSubjects = trendingSubjects
+        .sort((a, b) => b.frequency - a.frequency)
+        .slice(0, maxSubjects);
+
+      const processingTime = Date.now() - startTime;
+      const successRate = 1.0; // Simple operation, assume success if we get here
+
+      const result: TrendingSubjectsResponse = {
+        summary: {
+          operation: 'get_trending_subjects',
+          total_results: sortedSubjects.length,
+          timeframe,
+          processing_time_ms: processingTime,
+          success_rate: successRate,
+          cache_hits: cacheHits,
+        },
+        full_response: {
+          items: sortedSubjects,
+          performance_stats: {
+            processing_time_ms: processingTime,
+            items_processed: sortedSubjects.length,
+            cache_hits: cacheHits,
+            cache_misses: cacheHits === 0 ? 1 : 0,
+            success_rate: successRate,
+          },
+          analysis_period: {
+            start: timeRange.start,
+            end: timeRange.end,
+          },
+          content_analyzed: contentAnalyzed,
+        },
+      };
+
+      // Cache the results
+      globalCache.set(cacheKey, result, CacheTTL.TRENDING_ANALYSIS);
+
+      return result;
+
+    } catch (error) {
+      throw this.handleServiceError('getTrendingSubjects', error, params);
+    }
+  }
+
+  private validateSearchAllParams(params: SearchAllParams): void {
+    // First validate base search params
+    this.validateSearchParams(params);
+
+    if (params.max_results !== undefined && (params.max_results < 1 || params.max_results > 2000)) {
+      throw new APValidationError('max_results must be between 1 and 2000', 'max_results', { max_results: params.max_results });
+    }
+
+    if (params.progress_updates !== undefined && typeof params.progress_updates !== 'boolean') {
+      throw new APValidationError('progress_updates must be a boolean', 'progress_updates', { progress_updates: params.progress_updates });
+    }
+
+    if (params.deduplicate !== undefined && typeof params.deduplicate !== 'boolean') {
+      throw new APValidationError('deduplicate must be a boolean', 'deduplicate', { deduplicate: params.deduplicate });
+    }
+  }
+
+  private validateBulkContentParams(params: BulkContentParams): void {
+    if (!params.item_ids || !Array.isArray(params.item_ids)) {
+      throw new APValidationError('item_ids is required and must be an array', 'item_ids', { item_ids: params.item_ids });
+    }
+
+    if (params.item_ids.length === 0) {
+      throw new APValidationError('item_ids cannot be empty', 'item_ids', { item_ids: params.item_ids });
+    }
+
+    if (params.item_ids.length > 50) {
+      throw new APValidationError('item_ids cannot contain more than 50 items', 'item_ids', { count: params.item_ids.length });
+    }
+
+    // Check for duplicate IDs
+    const uniqueIds = new Set(params.item_ids);
+    if (uniqueIds.size !== params.item_ids.length) {
+      throw new APValidationError('item_ids contains duplicate values', 'item_ids');
+    }
+
+    if (params.include && !Array.isArray(params.include)) {
+      throw new APValidationError('include must be an array of strings', 'include', { include: params.include });
+    }
+
+    if (params.exclude && !Array.isArray(params.exclude)) {
+      throw new APValidationError('exclude must be an array of strings', 'exclude', { exclude: params.exclude });
+    }
+
+    if (params.batch_size !== undefined && (params.batch_size < 1 || params.batch_size > 20)) {
+      throw new APValidationError('batch_size must be between 1 and 20', 'batch_size', { batch_size: params.batch_size });
+    }
+
+    if (params.fail_on_missing !== undefined && typeof params.fail_on_missing !== 'boolean') {
+      throw new APValidationError('fail_on_missing must be a boolean', 'fail_on_missing', { fail_on_missing: params.fail_on_missing });
+    }
+  }
+
+  private validateTrendingSubjectsParams(params: TrendingSubjectsParams): void {
+    if (params.timeframe && !['hour', 'day', 'week'].includes(params.timeframe)) {
+      throw new APValidationError('timeframe must be one of: hour, day, week', 'timeframe', { timeframe: params.timeframe });
+    }
+
+    if (params.max_subjects !== undefined && (params.max_subjects < 1 || params.max_subjects > 100)) {
+      throw new APValidationError('max_subjects must be between 1 and 100', 'max_subjects', { max_subjects: params.max_subjects });
+    }
+
+    if (params.min_frequency !== undefined && (params.min_frequency < 1 || params.min_frequency > 50)) {
+      throw new APValidationError('min_frequency must be between 1 and 50', 'min_frequency', { min_frequency: params.min_frequency });
+    }
+
+    if (params.subject_types && !Array.isArray(params.subject_types)) {
+      throw new APValidationError('subject_types must be an array of strings', 'subject_types', { subject_types: params.subject_types });
+    }
+  }
+
+  private createBatches<T>(items: T[], batchSize: number): T[][] {
+    const batches: T[][] = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+      batches.push(items.slice(i, i + batchSize));
+    }
+    return batches;
   }
 }

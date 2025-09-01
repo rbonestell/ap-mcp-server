@@ -541,10 +541,6 @@ export interface APConfig {
 }
 
 /**
- * Enhanced Query Intelligence Types for Phase 2
- */
-
-/**
  * Parameters for optimize search query tool
  */
 export interface OptimizeQueryParams {
@@ -676,4 +672,138 @@ export interface ContentRecommendationsResponse {
   total_recommendations: number;
   search_strategy: string;
   filters_applied: string[];
+}
+
+/**
+ * Parameters for auto-pagination search
+ */
+export interface SearchAllParams extends SearchParams {
+  max_results?: number;
+  progress_updates?: boolean;
+  deduplicate?: boolean;
+}
+
+/**
+ * Performance statistics for operations
+ */
+export interface PerformanceStats {
+  processing_time_ms: number;
+  pages_fetched?: number;
+  items_processed?: number;
+  cache_hits?: number;
+  cache_misses?: number;
+  success_rate: number;
+  batch_count?: number;
+  errors?: string[];
+}
+
+/**
+ * Response structure for auto-pagination search
+ */
+export interface SearchAllResponse {
+  summary: {
+    operation: string;
+    total_results: number;
+    pages_fetched: number;
+    cache_hits: number;
+    processing_time_ms: number;
+    success_rate: number;
+    deduplicated_count?: number;
+  };
+  full_response: {
+    items: ContentResult[];
+    performance_stats: PerformanceStats;
+    pagination_info: {
+      total_pages: number;
+      max_results_reached: boolean;
+      final_page_size: number;
+    };
+    errors?: any[];
+  };
+}
+
+/**
+ * Parameters for bulk content retrieval
+ */
+export interface BulkContentParams {
+  item_ids: string[];
+  include?: string[];
+  exclude?: string[];
+  fail_on_missing?: boolean;
+  batch_size?: number;
+}
+
+/**
+ * Bulk content retrieval result
+ */
+export interface BulkContentResult {
+  content_id: string;
+  success: boolean;
+  content?: ContentResult;
+  error?: string;
+}
+
+/**
+ * Response structure for bulk content retrieval
+ */
+export interface BulkContentResponse {
+  summary: {
+    operation: string;
+    total_results: number;
+    successful_retrievals: number;
+    failed_retrievals: number;
+    processing_time_ms: number;
+    success_rate: number;
+    batch_count: number;
+  };
+  full_response: {
+    items: BulkContentResult[];
+    performance_stats: PerformanceStats;
+    missing_item_ids: string[];
+    errors?: any[];
+  };
+}
+
+/**
+ * Parameters for trending subjects discovery
+ */
+export interface TrendingSubjectsParams {
+  timeframe?: 'hour' | 'day' | 'week';
+  max_subjects?: number;
+  min_frequency?: number;
+  subject_types?: string[];
+}
+
+/**
+ * Trending subject data
+ */
+export interface TrendingSubject {
+  subject_name: string;
+  subject_code?: string;
+  frequency: number;
+  trend_score: number;
+  sample_content_ids: string[];
+}
+
+/**
+ * Response structure for trending subjects discovery
+ */
+export interface TrendingSubjectsResponse {
+  summary: {
+    operation: string;
+    total_results: number;
+    timeframe: string;
+    processing_time_ms: number;
+    success_rate: number;
+    cache_hits?: number;
+  };
+  full_response: {
+    items: TrendingSubject[];
+    performance_stats: PerformanceStats;
+    analysis_period: {
+      start: string;
+      end: string;
+    };
+    content_analyzed: number;
+  };
 }

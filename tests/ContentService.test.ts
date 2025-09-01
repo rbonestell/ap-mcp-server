@@ -3,14 +3,14 @@
  * Tests all API methods, parameter validation, and error handling
  */
 
-import { ContentService } from '../src/services/ContentService.js';
+import { APAPIError, APError, APValidationError } from '../src/errors/APError.js';
 import { APHttpClient } from '../src/http/APHttpClient.js';
-import { APValidationError, APError, APAPIError } from '../src/errors/APError.js';
-import { 
-  mockSearchResponse, 
-  mockContentItem, 
-  mockRSSFeeds, 
-  mockAPIError 
+import { ContentService } from '../src/services/ContentService.js';
+import { globalCache } from '../src/utils/Cache.js';
+import {
+	mockContentItem,
+	mockRSSFeeds,
+	mockSearchResponse
 } from './fixtures/api-responses.js';
 
 // Mock APHttpClient
@@ -23,7 +23,22 @@ describe('ContentService', () => {
 
   beforeEach(() => {
     mockHttpClient = new MockAPHttpClient({} as any) as jest.Mocked<APHttpClient>;
+    // Ensure all methods are properly mocked
+    mockHttpClient.get = jest.fn();
+    mockHttpClient.post = jest.fn();
+    mockHttpClient.put = jest.fn();
+    mockHttpClient.delete = jest.fn();
     contentService = new ContentService(mockHttpClient);
+  });
+
+  afterEach(() => {
+    // Clear the cache after each test
+    globalCache.clear();
+  });
+
+  afterAll(() => {
+    // Stop the cleanup timer to prevent hanging
+    globalCache.stopCleanupTimer();
   });
 
   describe('searchContent', () => {
@@ -71,7 +86,7 @@ describe('ContentService', () => {
       // Valid page sizes should not throw
       mockHttpClient.get.mockResolvedValueOnce({ data: mockSearchResponse, status: 200, statusText: 'OK', headers: {} });
       await expect(contentService.searchContent({ page_size: 1 })).resolves.toBeDefined();
-      
+
       mockHttpClient.get.mockResolvedValueOnce({ data: mockSearchResponse, status: 200, statusText: 'OK', headers: {} });
       await expect(contentService.searchContent({ page_size: 100 })).resolves.toBeDefined();
     });
@@ -87,12 +102,12 @@ describe('ContentService', () => {
     });
 
     test('should handle HTTP client errors', async () => {
-      const error = new APAPIError('Search failed', 'SEARCH_ERROR', 400);
+      const error = new APAPIError('Search failed', 400, 'SEARCH_ERROR', {});
       mockHttpClient.get.mockRejectedValueOnce(error);
 
       const thrownError = await contentService.searchContent().catch(e => e);
 
-      expect(thrownError).toBeInstanceOf(APError);
+      expect(thrownError).toBeInstanceOf(APAPIError);
       expect(thrownError.details.operation).toBe('searchContent');
     });
 
@@ -175,12 +190,12 @@ describe('ContentService', () => {
     });
 
     test('should handle errors with context', async () => {
-      const error = new APAPIError('Item not found', 'NOT_FOUND', 404);
+      const error = new APAPIError('Item not found', 404, 'NOT_FOUND');
       mockHttpClient.get.mockRejectedValueOnce(error);
 
       const thrownError = await contentService.getContentItem('123', { format: 'json' }).catch(e => e);
 
-      expect(thrownError).toBeInstanceOf(APError);
+      expect(thrownError).toBeInstanceOf(APAPIError);
       expect(thrownError.details.operation).toBe('getContentItem');
       expect(thrownError.details.context).toEqual({ itemId: '123', format: 'json' });
     });
@@ -264,12 +279,12 @@ describe('ContentService', () => {
     });
 
     test('should handle errors', async () => {
-      const error = new APAPIError('RSS feeds not available', 'RSS_ERROR', 503);
+      const error = new APAPIError('RSS feeds not available', 503, 'RSS_ERROR');
       mockHttpClient.get.mockRejectedValueOnce(error);
 
       const thrownError = await contentService.getRSSFeeds().catch(e => e);
 
-      expect(thrownError).toBeInstanceOf(APError);
+      expect(thrownError).toBeInstanceOf(APAPIError);
       expect(thrownError.details.operation).toBe('getRSSFeeds');
     });
   });
@@ -330,12 +345,12 @@ describe('ContentService', () => {
     });
 
     test('should handle errors with context', async () => {
-      const error = new APAPIError('RSS feed not found', 'NOT_FOUND', 404);
+      const error = new APAPIError('RSS feed not found', 404, 'NOT_FOUND');
       mockHttpClient.get.mockRejectedValueOnce(error);
 
       const thrownError = await contentService.getRSSFeed(999, { page_size: 10 }).catch(e => e);
 
-      expect(thrownError).toBeInstanceOf(APError);
+      expect(thrownError).toBeInstanceOf(APAPIError);
       expect(thrownError.details.context).toEqual({ rssId: 999, page_size: 10 });
     });
   });
@@ -399,7 +414,7 @@ describe('ContentService', () => {
     });
 
     test('should build query with media type', () => {
-      const result = ContentService.buildSearchQuery({ 
+      const result = ContentService.buildSearchQuery({
         query: 'news',
         mediaType: 'picture'
       });
@@ -555,16 +570,16 @@ describe('ContentService', () => {
 
   describe('Error handling', () => {
     test('should preserve AP error details when wrapping', async () => {
-      const originalError = new APAPIError('Original error', 404, 'ORIGINAL_CODE', { 
-        field: 'test', 
-        originalContext: 'value' 
+      const originalError = new APAPIError('Original error', 404, 'ORIGINAL_CODE', {
+        field: 'test',
+        originalContext: 'value'
       });
-      
+
       mockHttpClient.get.mockRejectedValueOnce(originalError);
 
       const thrownError = await contentService.searchContent({ q: 'test' }).catch(e => e);
 
-      expect(thrownError).toBeInstanceOf(APError);
+      expect(thrownError).toBeInstanceOf(APAPIError);
       expect(thrownError.message).toBe('Original error');
       expect(thrownError.code).toBe('ORIGINAL_CODE');
       expect(thrownError.statusCode).toBe(404);
@@ -606,10 +621,7 @@ describe('ContentService', () => {
     });
   });
 
-  /**
-   * Phase 2: Enhanced Query Intelligence Tests
-   */
-  describe('Enhanced Query Intelligence - Phase 2', () => {
+  describe('Enhanced Query Intelligence', () => {
     describe('optimizeSearchQuery', () => {
       test('should optimize natural language query with NLP patterns', async () => {
         const params = {
@@ -695,13 +707,13 @@ describe('ContentService', () => {
 
       test('should validate natural_query length', async () => {
         const longQuery = 'a'.repeat(501);
-        
+
         await expect(contentService.optimizeSearchQuery({ natural_query: longQuery }))
           .rejects.toThrow(APValidationError);
       });
 
       test('should validate optimize_for parameter', async () => {
-        await expect(contentService.optimizeSearchQuery({ 
+        await expect(contentService.optimizeSearchQuery({
           natural_query: 'test',
           optimize_for: 'invalid' as any
         })).rejects.toThrow(APValidationError);
@@ -786,11 +798,11 @@ describe('ContentService', () => {
           }
         };
 
-        mockHttpClient.get.mockResolvedValue({ 
-          data: mockTrendingSearchResponse, 
-          status: 200, 
-          statusText: 'OK', 
-          headers: {} 
+        mockHttpClient.get.mockResolvedValue({
+          data: mockTrendingSearchResponse,
+          status: 200,
+          statusText: 'OK',
+          headers: {}
         });
       });
 
@@ -833,13 +845,13 @@ describe('ContentService', () => {
 
         expect(result.timeframe).toBe('week');
         expect(result.trending_topics.length).toBeLessThanOrEqual(5);
-        
+
         // Check that the time range is approximately one week
         const startTime = new Date(result.analysis_period.start).getTime();
         const endTime = new Date(result.analysis_period.end).getTime();
         const weekInMs = 7 * 24 * 60 * 60 * 1000;
         const timeDiff = endTime - startTime;
-        
+
         expect(timeDiff).toBeGreaterThan(weekInMs * 0.9); // Allow some variance
         expect(timeDiff).toBeLessThan(weekInMs * 1.1);
       });
@@ -889,7 +901,7 @@ describe('ContentService', () => {
       });
 
       test('should handle search errors gracefully', async () => {
-        mockHttpClient.get.mockRejectedValueOnce(new APAPIError('Search failed', 'SEARCH_ERROR', 500));
+        mockHttpClient.get.mockRejectedValueOnce(new APAPIError('Search failed', 500, 'SEARCH_ERROR'));
 
         await expect(contentService.analyzeContentTrends())
           .rejects.toThrow(APError);
@@ -1146,7 +1158,7 @@ describe('ContentService', () => {
 
       test('should handle seed content analysis errors gracefully', async () => {
         // Mock getContentItem to fail for seed content
-        mockHttpClient.get.mockRejectedValueOnce(new APAPIError('Content not found', 'NOT_FOUND', 404));
+        mockHttpClient.get.mockRejectedValueOnce(new APAPIError('Content not found', 404, 'NOT_FOUND'));
 
         const params = {
           seed_content: ['nonexistent'],
@@ -1218,6 +1230,424 @@ describe('ContentService', () => {
           expect(result.recommendations[0].relevance_score)
             .toBeGreaterThanOrEqual(result.recommendations[1].relevance_score);
         }
+      });
+    });
+
+    describe('Bulk Operations & Performance', () => {
+      describe('searchContentAll', () => {
+        test('should search content with auto-pagination', async () => {
+          // Mock first page
+          const firstPageResponse = {
+            ...mockSearchResponse,
+            data: {
+              ...mockSearchResponse.data,
+              total_items: 150,
+              current_item_count: 25,
+              current_page: 1,
+              page_size: 25,
+              items: Array(25).fill(mockContentItem)
+            }
+          };
+
+          // Mock second page
+          const secondPageResponse = {
+            ...mockSearchResponse,
+            data: {
+              ...mockSearchResponse.data,
+              total_items: 150,
+              current_item_count: 25,
+              current_page: 2,
+              page_size: 25,
+              items: Array(25).fill(mockContentItem)
+            }
+          };
+
+          mockHttpClient.get
+            .mockResolvedValueOnce({ data: firstPageResponse, status: 200, statusText: 'OK', headers: {} })
+            .mockResolvedValueOnce({ data: secondPageResponse, status: 200, statusText: 'OK', headers: {} });
+
+          const result = await contentService.searchContentAll({
+            q: 'test query',
+            max_results: 50,
+            deduplicate: false
+          });
+
+          expect(result.summary.operation).toBe('search_content_all');
+          expect(result.summary.total_results).toBe(50);
+          expect(result.summary.pages_fetched).toBe(2);
+          expect(result.full_response.items).toHaveLength(50);
+          expect(mockHttpClient.get).toHaveBeenCalledTimes(2);
+        });
+
+        test('should handle deduplication across pages', async () => {
+          const duplicatedItem = { ...mockContentItem, item: { ...mockContentItem.item, altids: { itemid: 'duplicate-123' } } };
+          const uniqueItem = { ...mockContentItem, item: { ...mockContentItem.item, altids: { itemid: 'unique-456' } } };
+
+          const firstPageResponse = {
+            ...mockSearchResponse,
+            data: {
+              ...mockSearchResponse.data,
+              total_items: 50,
+              current_item_count: 25,
+              items: [duplicatedItem, uniqueItem, ...Array(23).fill(mockContentItem)]
+            }
+          };
+
+          const secondPageResponse = {
+            ...mockSearchResponse,
+            data: {
+              ...mockSearchResponse.data,
+              total_items: 50,
+              current_item_count: 25,
+              current_page: 2,
+              items: [duplicatedItem, ...Array(24).fill(mockContentItem)] // Same item again
+            }
+          };
+
+          mockHttpClient.get
+            .mockResolvedValueOnce({ data: firstPageResponse, status: 200, statusText: 'OK', headers: {} })
+            .mockResolvedValueOnce({ data: secondPageResponse, status: 200, statusText: 'OK', headers: {} });
+
+          const result = await contentService.searchContentAll({
+            q: 'test query',
+            max_results: 50,
+            deduplicate: true
+          });
+
+          expect(result.summary.operation).toBe('search_content_all');
+          expect(result.summary.total_results).toBeLessThan(50); // Should be deduplicated
+        });
+
+        test('should validate max_results parameter', async () => {
+          await expect(contentService.searchContentAll({ max_results: 0 }))
+            .rejects.toThrow(APValidationError);
+
+          await expect(contentService.searchContentAll({ max_results: 2001 }))
+            .rejects.toThrow(APValidationError);
+        });
+
+        test('should handle pagination errors gracefully', async () => {
+          const firstPageResponse = {
+            ...mockSearchResponse,
+            data: {
+              ...mockSearchResponse.data,
+              total_items: 100,
+              current_item_count: 25,
+              current_page: 1,
+              page_size: 25,
+              items: Array(25).fill(mockContentItem)
+            }
+          };
+
+          mockHttpClient.get
+            .mockResolvedValueOnce({ data: firstPageResponse, status: 200, statusText: 'OK', headers: {} })
+            .mockRejectedValueOnce(new APAPIError('Page 2 failed', 500, 'PAGE_ERROR'));
+
+          const result = await contentService.searchContentAll({
+            q: 'test query',
+            max_results: 50
+          });
+
+          expect(result.summary.total_results).toBe(25); // Only first page succeeded
+          expect(result.full_response.errors).toBeDefined();
+          expect(result.summary.success_rate).toBeLessThan(1);
+        });
+      });
+
+      describe('getContentBulk', () => {
+        test('should retrieve multiple content items in batches', async () => {
+          const itemIds = ['item1', 'item2', 'item3', 'item4', 'item5'];
+          const mockItemResponse = { data: mockContentItem };
+
+          // Mock successful responses for all items
+          itemIds.forEach(() => {
+            mockHttpClient.get.mockResolvedValueOnce({
+              data: mockItemResponse,
+              status: 200,
+              statusText: 'OK',
+              headers: {}
+            });
+          });
+
+          const result = await contentService.getContentBulk({
+            item_ids: itemIds,
+            batch_size: 2
+          });
+
+          expect(result.summary.operation).toBe('get_content_bulk');
+          expect(result.summary.total_results).toBe(5);
+          expect(result.summary.successful_retrievals).toBe(5);
+          expect(result.summary.failed_retrievals).toBe(0);
+          expect(result.summary.success_rate).toBe(1);
+          expect(result.full_response.items).toHaveLength(5);
+          expect(mockHttpClient.get).toHaveBeenCalledTimes(5);
+        });
+
+        test('should handle missing items gracefully', async () => {
+          const itemIds = ['item1', 'missing-item', 'item3'];
+          const mockItemResponse = mockContentItem;
+
+          // Mock specific URLs - note that getContentItem encodes the itemId
+          mockHttpClient.get.mockImplementation((url: string) => {
+            if (url === 'content/item1') {
+              return Promise.resolve({ data: mockItemResponse, status: 200, statusText: 'OK', headers: {} });
+            } else if (url === 'content/missing-item') {
+              return Promise.reject(new APAPIError('Not found', 404, 'NOT_FOUND'));
+            } else if (url === 'content/item3') {
+              return Promise.resolve({ data: mockItemResponse, status: 200, statusText: 'OK', headers: {} });
+            }
+            return Promise.reject(new Error(`Unexpected URL: ${url}`));
+          });
+
+          const result = await contentService.getContentBulk({
+            item_ids: itemIds,
+            fail_on_missing: false,
+            batch_size: 1  // Force sequential processing to ensure mock order
+          });
+
+          expect(result.summary.successful_retrievals).toBe(2);
+          expect(result.summary.failed_retrievals).toBe(1);
+          expect(result.full_response.missing_item_ids).toContain('missing-item');
+          expect(result.summary.success_rate).toBeCloseTo(0.667, 2);
+        });
+
+        test('should fail fast when fail_on_missing is true', async () => {
+          const itemIds = ['item1', 'missing-item'];
+          const mockItemResponse = mockContentItem;
+
+          // Mock specific URLs - note that getContentItem encodes the itemId
+          mockHttpClient.get.mockImplementation((url: string) => {
+            if (url === 'content/item1') {
+              return Promise.resolve({ data: mockItemResponse, status: 200, statusText: 'OK', headers: {} });
+            } else if (url === 'content/missing-item') {
+              return Promise.reject(new APAPIError('Not found', 404, 'NOT_FOUND'));
+            }
+            return Promise.reject(new Error(`Unexpected URL: ${url}`));
+          });
+
+          await expect(contentService.getContentBulk({
+            item_ids: itemIds,
+            fail_on_missing: true,
+            batch_size: 1  // Force sequential processing to ensure mock order
+          })).rejects.toThrow(APValidationError);
+        });
+
+        test('should validate item_ids parameter', async () => {
+          await expect(contentService.getContentBulk({ item_ids: [] }))
+            .rejects.toThrow(APValidationError);
+
+          await expect(contentService.getContentBulk({ item_ids: Array(51).fill('item') }))
+            .rejects.toThrow(APValidationError);
+
+          await expect(contentService.getContentBulk({ item_ids: ['item1', 'item1'] }))
+            .rejects.toThrow(APValidationError);
+        });
+
+        test('should validate batch_size parameter', async () => {
+          await expect(contentService.getContentBulk({
+            item_ids: ['item1'],
+            batch_size: 0
+          })).rejects.toThrow(APValidationError);
+
+          await expect(contentService.getContentBulk({
+            item_ids: ['item1'],
+            batch_size: 21
+          })).rejects.toThrow(APValidationError);
+        });
+      });
+
+      describe('getTrendingSubjects', () => {
+        test('should get trending subjects with default parameters', async () => {
+          const mockTrendingResponse = {
+            ...mockSearchResponse,
+            data: {
+              ...mockSearchResponse.data,
+              items: [
+                {
+                  item: {
+                    ...mockContentItem.item,
+                    subject: [
+                      { name: 'Technology', code: 'TECH001' },
+                      { name: 'Innovation', code: 'INNOV001' }
+                    ]
+                  }
+                },
+                {
+                  item: {
+                    ...mockContentItem.item,
+                    subject: [
+                      { name: 'Technology', code: 'TECH001' },
+                      { name: 'Business', code: 'BIZ001' }
+                    ]
+                  }
+                }
+              ]
+            }
+          };
+
+          mockHttpClient.get.mockResolvedValueOnce({
+            data: mockTrendingResponse,
+            status: 200,
+            statusText: 'OK',
+            headers: {}
+          });
+
+          const result = await contentService.getTrendingSubjects();
+
+          expect(result.summary.operation).toBe('get_trending_subjects');
+          expect(result.summary.timeframe).toBe('day');
+          expect(result.full_response.items).toBeDefined();
+          expect(result.full_response.items.length).toBeGreaterThan(0);
+
+          // Technology should appear twice, so it should be the top trending subject
+          const topSubject = result.full_response.items[0];
+          expect(topSubject.subject_name).toBe('Technology');
+          expect(topSubject.frequency).toBe(2);
+        });
+
+        test('should filter subjects by minimum frequency', async () => {
+          const mockTrendingResponse = {
+            ...mockSearchResponse,
+            data: {
+              ...mockSearchResponse.data,
+              items: [
+                {
+                  item: {
+                    ...mockContentItem.item,
+                    subject: [
+                      { name: 'Popular Topic', code: 'POP001' },
+                      { name: 'Rare Topic', code: 'RARE001' }
+                    ]
+                  }
+                },
+                {
+                  item: {
+                    ...mockContentItem.item,
+                    subject: [
+                      { name: 'Popular Topic', code: 'POP001' }
+                    ]
+                  }
+                },
+                {
+                  item: {
+                    ...mockContentItem.item,
+                    subject: [
+                      { name: 'Popular Topic', code: 'POP001' }
+                    ]
+                  }
+                }
+              ]
+            }
+          };
+
+          mockHttpClient.get.mockResolvedValueOnce({
+            data: mockTrendingResponse,
+            status: 200,
+            statusText: 'OK',
+            headers: {}
+          });
+
+          const result = await contentService.getTrendingSubjects({
+            min_frequency: 3
+          });
+
+          // Only 'Popular Topic' should meet the minimum frequency of 3
+          expect(result.full_response.items).toHaveLength(1);
+          expect(result.full_response.items[0].subject_name).toBe('Popular Topic');
+          expect(result.full_response.items[0].frequency).toBe(3);
+        });
+
+        test('should validate timeframe parameter', async () => {
+          await expect(contentService.getTrendingSubjects({ timeframe: 'invalid' as any }))
+            .rejects.toThrow(APValidationError);
+        });
+
+        test('should validate max_subjects parameter', async () => {
+          await expect(contentService.getTrendingSubjects({ max_subjects: 0 }))
+            .rejects.toThrow(APValidationError);
+
+          await expect(contentService.getTrendingSubjects({ max_subjects: 101 }))
+            .rejects.toThrow(APValidationError);
+        });
+
+        test('should validate min_frequency parameter', async () => {
+          await expect(contentService.getTrendingSubjects({ min_frequency: 0 }))
+            .rejects.toThrow(APValidationError);
+
+          await expect(contentService.getTrendingSubjects({ min_frequency: 51 }))
+            .rejects.toThrow(APValidationError);
+        });
+
+        test('should limit results to max_subjects', async () => {
+          const mockTrendingResponse = {
+            ...mockSearchResponse,
+            data: {
+              ...mockSearchResponse.data,
+              items: Array(10).fill({
+                item: {
+                  ...mockContentItem.item,
+                  subject: [
+                    { name: 'Subject1', code: 'S001' },
+                    { name: 'Subject2', code: 'S002' },
+                    { name: 'Subject3', code: 'S003' },
+                    { name: 'Subject4', code: 'S004' },
+                    { name: 'Subject5', code: 'S005' }
+                  ]
+                }
+              })
+            }
+          };
+
+          mockHttpClient.get.mockResolvedValueOnce({
+            data: mockTrendingResponse,
+            status: 200,
+            statusText: 'OK',
+            headers: {}
+          });
+
+          const result = await contentService.getTrendingSubjects({
+            max_subjects: 3
+          });
+
+          expect(result.full_response.items.length).toBeLessThanOrEqual(3);
+        });
+      });
+
+      describe('Performance and Caching', () => {
+        test('should use cache for repeated operations', async () => {
+          const mockResponse = { data: mockSearchResponse };
+          mockHttpClient.get.mockResolvedValueOnce(mockResponse);
+
+          // First call should hit the API
+          const result1 = await contentService.searchContentAll({ q: 'test' });
+          expect(mockHttpClient.get).toHaveBeenCalledTimes(1);
+
+          // Second identical call should use cache (no additional API call)
+          const result2 = await contentService.searchContentAll({ q: 'test' });
+          expect(mockHttpClient.get).toHaveBeenCalledTimes(1); // Still only 1 call
+          expect(result2.summary.cache_hits).toBe(1);
+        });
+
+        test('should track performance metrics', async () => {
+          const mockResponse = { data: mockSearchResponse };
+          mockHttpClient.get.mockResolvedValueOnce(mockResponse);
+
+          const result = await contentService.searchContentAll({ q: 'test' });
+
+          expect(result.summary.processing_time_ms).toBeGreaterThanOrEqual(0);
+          expect(result.full_response.performance_stats.processing_time_ms).toBeGreaterThanOrEqual(0);
+          expect(result.summary.success_rate).toBe(1);
+        });
+
+        test('should handle cache misses properly', async () => {
+          const mockResponse = { data: mockSearchResponse };
+          mockHttpClient.get.mockResolvedValueOnce(mockResponse);
+
+          const result = await contentService.searchContentAll({ q: 'unique-query' });
+
+          expect(result.summary.cache_hits).toBe(0);
+          expect(result.full_response.performance_stats.cache_misses).toBe(1);
+        });
       });
     });
   });
