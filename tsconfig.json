@@ -1,9 +1,9 @@
 {
 	"compilerOptions": {
-		"target": "ES2022",
-		"module": "nodenext",
-		"moduleResolution": "nodenext",
-		"lib": ["ES2022"],
+		"target": "ES2020",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"lib": ["ES2020"],
 		"outDir": "./dist",
 		"rootDir": "./src",
 		"strict": true,
@@ -11,9 +11,10 @@
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true,
 		"declaration": true,
-		"declarationMap": true,
-		"sourceMap": true,
-		"removeComments": false,
+		"declarationMap": false,
+		"sourceMap": false,
+		"removeComments": true,
+		"stripInternal": true,
 		"noImplicitAny": true,
 		"noImplicitReturns": true,
 		"noUnusedLocals": true,
@@ -23,8 +24,16 @@
 		"resolveJsonModule": true,
 		"allowSyntheticDefaultImports": true,
 		"isolatedModules": true,
-		"useDefineForClassFields": true
+		"useDefineForClassFields": true,
+		"noEmitOnError": true
 	},
 	"include": ["src/**/*"],
-	"exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
+	"exclude": [
+		"node_modules",
+		"dist",
+		"**/*.test.ts",
+		"**/*.spec.ts",
+		"**/*.spec.d.ts",
+		"**/tests/**"
+	]
 }
