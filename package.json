@@ -1,6 +1,6 @@
 {
 	"name": "ap-mcp-server",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"description": "Model Context Protocol (MCP) server for the Associated Press Media API",
 	"main": "dist/index.js",
 	"bin": {
