@@ -318,12 +318,25 @@ export class ContentService {
         content = Buffer.from(arrayBuffer);
       }
 
-      return {
+      const result: {
+        content: string | Buffer;
+        contentType: string;
+        contentLength?: number;
+        fileName?: string;
+      } = {
         content,
-        contentType,
-        contentLength,
-        fileName,
+        contentType
       };
+      
+      if (contentLength !== undefined) {
+        result.contentLength = contentLength;
+      }
+      
+      if (fileName) {
+        result.fileName = fileName;
+      }
+      
+      return result;
 
     } catch (error) {
       if (error instanceof APError) {

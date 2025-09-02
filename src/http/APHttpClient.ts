@@ -53,7 +53,7 @@ export class APHttpClient {
    * Execute a GET request with retry logic
    */
   async get<T = any>(
-    endpoint: string, 
+    endpoint: string,
     params?: Record<string, any>,
     options?: RequestOptions
   ): Promise<HttpResponse<T>> {
@@ -65,8 +65,8 @@ export class APHttpClient {
    * Execute a POST request with retry logic
    */
   async post<T = any>(
-    endpoint: string, 
-    body?: any, 
+    endpoint: string,
+    body?: any,
     params?: Record<string, any>,
     options?: RequestOptions
   ): Promise<HttpResponse<T>> {
@@ -78,8 +78,8 @@ export class APHttpClient {
    * Execute a PUT request with retry logic
    */
   async put<T = any>(
-    endpoint: string, 
-    body?: any, 
+    endpoint: string,
+    body?: any,
     params?: Record<string, any>,
     options?: RequestOptions
   ): Promise<HttpResponse<T>> {
@@ -91,7 +91,7 @@ export class APHttpClient {
    * Execute a DELETE request with retry logic
    */
   async delete<T = any>(
-    endpoint: string, 
+    endpoint: string,
     params?: Record<string, any>,
     options?: RequestOptions
   ): Promise<HttpResponse<T>> {
@@ -112,12 +112,22 @@ export class APHttpClient {
       return undefined;
     }
 
-    return {
+    const result: {
+      remaining: number;
+      reset: number;
+      limit: number;
+      retry_after?: number;
+    } = {
       remaining: parseInt(remaining || '100', 10),
       reset: parseInt(reset || '0', 10),
-      limit: parseInt(limit || '100', 10),
-      retry_after: retryAfter ? parseInt(retryAfter, 10) : undefined
+      limit: parseInt(limit || '100', 10)
     };
+
+    if (retryAfter) {
+      result.retry_after = parseInt(retryAfter, 10);
+    }
+
+    return result;
   }
 
   /**
@@ -130,14 +140,14 @@ export class APHttpClient {
     }
 
     const controller = new AbortController();
-    
+
     // Abort if timeout occurs
     const handleTimeout = () => {
       if (!controller.signal.aborted) {
         controller.abort();
       }
     };
-    
+
     // Abort if external signal aborts
     const handleExternal = () => {
       if (!controller.signal.aborted) {
@@ -330,13 +340,18 @@ export class APHttpClient {
     // Extract rate limit information
     const rateLimit = this.extractRateLimitInfo(headers);
 
-    return {
+    const result: HttpResponse<T> = {
       data,
       status: response.status,
       statusText: response.statusText,
-      headers,
-      rateLimit,
+      headers
     };
+
+    if (rateLimit) {
+      result.rateLimit = rateLimit;
+    }
+
+    return result;
   }
 
   /**
