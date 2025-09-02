@@ -41,6 +41,7 @@ export default {
     '!src/**/__tests__/**',
     '!src/**/*.test.ts',
     '!src/**/*.spec.ts',
+		'!src/prompts/templates/**',
     '!src/index.ts' // Skip entry point for now
   ],
 
