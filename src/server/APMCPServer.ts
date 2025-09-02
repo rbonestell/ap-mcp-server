@@ -274,7 +274,7 @@ export class APMCPServer {
           const result = await this.contentService.searchContent(params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -296,7 +296,7 @@ export class APMCPServer {
           const result = await this.contentService.getContentItem(params.item_id, params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -318,7 +318,7 @@ export class APMCPServer {
           const result = await this.contentService.getContentFeed(params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -334,14 +334,14 @@ export class APMCPServer {
       {
         title: 'Get Account Info',
         description: 'Get account information and available endpoints',
-        inputSchema: z.object({}),
+        inputSchema: z.object({}).shape,
       },
       async () => {
         try {
           const result = await this.accountService.getAccountInfo();
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -363,7 +363,7 @@ export class APMCPServer {
           const result = await this.accountService.getAccountPlans(params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -385,7 +385,7 @@ export class APMCPServer {
           const result = await this.accountService.getAccountDownloads(params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -400,14 +400,14 @@ export class APMCPServer {
       {
         title: 'Get Account Quotas',
         description: 'Get account API quotas and usage limits',
-        inputSchema: z.object({}),
+        inputSchema: z.object({}).shape,
       },
       async () => {
         try {
           const result = await this.accountService.getAccountQuotas();
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -423,14 +423,14 @@ export class APMCPServer {
       {
         title: 'Get RSS Feeds',
         description: 'Get list of available RSS feeds',
-        inputSchema: z.object({}),
+        inputSchema: z.object({}).shape,
       },
       async () => {
         try {
           const result = await this.contentService.getRSSFeeds();
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -452,7 +452,7 @@ export class APMCPServer {
           const result = await this.contentService.getRSSFeed(params.rss_id, params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -475,7 +475,7 @@ export class APMCPServer {
           const result = await this.monitoringService.createMonitor(params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -490,14 +490,14 @@ export class APMCPServer {
       {
         title: 'List Monitors',
         description: 'List all existing monitors',
-        inputSchema: z.object({}),
+        inputSchema: z.object({}).shape,
       },
       async () => {
         try {
           const result = await this.monitoringService.listMonitors();
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -519,7 +519,7 @@ export class APMCPServer {
           const result = await this.monitoringService.getMonitor(params.monitor_id);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -542,7 +542,7 @@ export class APMCPServer {
           const result = await this.monitoringService.updateMonitor(monitor_id, updateData);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -564,7 +564,7 @@ export class APMCPServer {
           const result = await this.monitoringService.deleteMonitor(params.monitor_id);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -586,7 +586,7 @@ export class APMCPServer {
           const result = await this.monitoringService.getMonitorStatus(params.monitor_id, params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -608,7 +608,7 @@ export class APMCPServer {
           const result = await this.monitoringService.getMonitorHistory(params.monitor_id, params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -631,7 +631,7 @@ export class APMCPServer {
           const result = await this.accountService.getFollowedTopics(params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -653,7 +653,7 @@ export class APMCPServer {
           const result = await this.contentService.getOnDemandContent(params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -676,7 +676,7 @@ export class APMCPServer {
           const result = await ContentService.buildSearchQuery(params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -698,7 +698,7 @@ export class APMCPServer {
           const result = await this.contentService.optimizeSearchQuery(params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -720,7 +720,7 @@ export class APMCPServer {
           const result = await this.contentService.analyzeContentTrends(params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -742,7 +742,7 @@ export class APMCPServer {
           const result = await this.contentService.getContentRecommendations(params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -764,7 +764,7 @@ export class APMCPServer {
           const result = await this.contentService.searchContentAll(params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -786,7 +786,7 @@ export class APMCPServer {
           const result = await this.contentService.getContentBulk(params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -808,7 +808,7 @@ export class APMCPServer {
           const result = await this.contentService.getTrendingSubjects(params);
           return {
             content: [{
-              type: 'text',
+              type: 'text' as const,
               text: JSON.stringify(result, null, 2),
             }],
           };
@@ -822,12 +822,12 @@ export class APMCPServer {
   /**
    * Handle errors in a consistent way for all tools
    */
-  private handleToolError(error: unknown): { content: Array<{ type: string; text: string }>, isError?: boolean } {
+  private handleToolError(error: unknown): { content: Array<{ type: 'text'; text: string }>, isError?: boolean } {
     const errorInfo = ErrorHandler.handleError(error);
 
     return {
       content: [{
-        type: 'text',
+        type: 'text' as const,
         text: JSON.stringify(errorInfo, null, 2),
       }],
       isError: true,
