@@ -251,12 +251,12 @@ export class ContentService {
       throw new APValidationError('Invalid AP API href URL', 'href', { href, hostname: url.hostname });
     }
 
-    try {
-      // Use the HTTP client's raw fetch capabilities, but we need to handle this differently
-      // since renditions may return various content types (text, images, videos, etc.)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for renditions
+    // Use the HTTP client's raw fetch capabilities, but we need to handle this differently
+    // since renditions may return various content types (text, images, videos, etc.)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for renditions
 
+    try {
       // Get headers from the HTTP client (which includes the API key)
       const baseHeaders = (this.httpClient as any).config.getHttpHeaders();
       
@@ -272,7 +272,6 @@ export class ContentService {
       };
 
       const response = await fetch(href, requestInit);
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new APAPIError(
@@ -348,6 +347,9 @@ export class ContentService {
       }
 
       throw this.handleServiceError('getContentRendition', error, { href, params });
+    } finally {
+      // Always clear the timeout to prevent memory leaks
+      clearTimeout(timeoutId);
     }
   }
 
