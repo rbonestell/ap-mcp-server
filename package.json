@@ -1,6 +1,6 @@
 {
 	"name": "ap-mcp-server",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"description": "Model Context Protocol (MCP) server for the Associated Press Media API",
 	"main": "dist/index.js",
 	"bin": {
@@ -51,7 +51,7 @@
 	},
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.17.4",
-		"zod": "^4.1.5"
+		"zod": "^3.25.76"
 	},
 	"devDependencies": {
 		"@stylistic/eslint-plugin": "^5.3.1",
