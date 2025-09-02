@@ -140,6 +140,12 @@ const GetOndemandContentSchema = z.object({
   session_label: z.string().optional().describe('Session label for tracking'),
 });
 
+const GetContentRenditionSchema = z.object({
+  href: z.string().describe('The href URL from a content item\'s renditions or links'),
+  format: z.string().optional().describe('Optional Accept header for desired format'),
+  encoding: z.string().optional().describe('Optional encoding preference for text content'),
+});
+
 const BuildSearchQuerySchema = z.object({
   query: z.string().optional().describe('Base text query'),
   dateRange: z.object({
@@ -662,6 +668,57 @@ export class APMCPServer {
               text: JSON.stringify(result, null, 2),
             }],
           };
+        } catch (error) {
+          return this.handleToolError(error);
+        }
+      }
+    );
+
+    this.server.registerTool(
+      'get_content_rendition',
+      {
+        title: 'Get Content Rendition',
+        description: 'Retrieve the full content of articles and media by fetching renditions using href URLs from previous search results',
+        inputSchema: GetContentRenditionSchema.shape,
+      },
+      async (params) => {
+        try {
+          const renditionParams: { format?: string; encoding?: string } = {};
+          if (params.format) renditionParams.format = params.format;
+          if (params.encoding) renditionParams.encoding = params.encoding;
+          
+          const result = await this.contentService.getContentRendition(params.href, renditionParams);
+          
+          // Handle the response based on content type
+          if (typeof result.content === 'string') {
+            // Text content - return as is
+            return {
+              content: [{
+                type: 'text' as const,
+                text: JSON.stringify({
+                  content: result.content,
+                  contentType: result.contentType,
+                  contentLength: result.contentLength,
+                  fileName: result.fileName,
+                }, null, 2),
+              }],
+            };
+          } else {
+            // Binary content - return metadata and base64 encoded data
+            return {
+              content: [{
+                type: 'text' as const,
+                text: JSON.stringify({
+                  content: result.content.toString('base64'),
+                  contentType: result.contentType,
+                  contentLength: result.contentLength,
+                  fileName: result.fileName,
+                  encoding: 'base64',
+                  message: 'Binary content has been base64 encoded',
+                }, null, 2),
+              }],
+            };
+          }
         } catch (error) {
           return this.handleToolError(error);
         }
