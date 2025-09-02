@@ -1,15 +1,16 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import * as packageInfo from '../../package.json';
 
 import { APConfigManager } from '../config/APConfig.js';
 import { ErrorHandler } from '../errors/APError.js';
 import { APHttpClient } from '../http/APHttpClient.js';
 import { ConnectionPool } from '../http/ConnectionPool.js';
+import { registerAPPrompts } from '../prompts/APPrompts.js';
 import { AccountService } from '../services/AccountService.js';
 import { ContentService } from '../services/ContentService.js';
 import { MonitoringService } from '../services/MonitoringService.js';
-import { registerAPPrompts } from '../prompts/APPrompts.js';
 
 // Define Zod schemas for all tools
 const SearchContentSchema = z.object({
@@ -240,10 +241,14 @@ export class APMCPServer {
     this.accountService = new AccountService(this.httpClient);
     this.monitoringService = new MonitoringService(this.httpClient);
 
+
+    // Read package.json to get the actual version
+    const version: string = packageInfo.version ?? '1.x';
+
     // Initialize MCP server using McpServer
     this.server = new McpServer({
       name: 'ap-mcp-server',
-      version: '1.2.0',
+      version: version, // Now uses dynamic version from package.json
     });
 
     this.setupTools();

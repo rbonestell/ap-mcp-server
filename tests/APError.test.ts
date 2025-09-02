@@ -42,17 +42,24 @@ describe('APError Base Class', () => {
     const error = new APError('Test message', 'TEST_CODE', 400, details);
 
     const json = error.toJSON();
-    expect(json).toEqual({
-      name: 'APError',
-      message: 'Test message',
-      code: 'TEST_CODE',
-      statusCode: 400,
-      details: details,
-      suggested_action: 'Review error details and adjust request',
-      can_retry: false,
-      alternative_tool: undefined,
-      stack: error.stack
-    });
+    
+    // Base properties that should always be present
+    expect(json.name).toBe('APError');
+    expect(json.message).toBe('Test message');
+    expect(json.code).toBe('TEST_CODE');
+    expect(json.statusCode).toBe(400);
+    expect(json.details).toEqual(details);
+    expect(json.suggested_action).toBe('Review error details and adjust request');
+    expect(json.can_retry).toBe(false);
+    expect(json.alternative_tool).toBeUndefined();
+    
+    // Stack should only be present in development or debug mode
+    // CRITICAL FIX: Stack traces are now excluded in production for security
+    if (process.env.NODE_ENV === 'development' || process.env.AP_DEBUG === 'true') {
+      expect(json.stack).toBe(error.stack);
+    } else {
+      expect(json.stack).toBeUndefined();
+    }
   });
 
   test('should maintain proper stack trace', () => {
@@ -60,6 +67,55 @@ describe('APError Base Class', () => {
 
     expect(error.stack).toBeDefined();
     expect(error.stack).toContain('APError.test.ts');
+  });
+
+  test('should exclude stack trace in production mode', () => {
+    // Save original values
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalApDebug = process.env.AP_DEBUG;
+    
+    // Set production mode
+    process.env.NODE_ENV = 'production';
+    delete process.env.AP_DEBUG;
+    
+    const error = new APError('Test message', 'TEST_CODE', 500);
+    const json = error.toJSON();
+    
+    // CRITICAL FIX VERIFICATION: Stack should not be exposed in production
+    expect(json.stack).toBeUndefined();
+    expect(json.name).toBe('APError');
+    expect(json.message).toBe('Test message');
+    expect(json.code).toBe('TEST_CODE');
+    
+    // Restore original values
+    process.env.NODE_ENV = originalNodeEnv;
+    if (originalApDebug !== undefined) {
+      process.env.AP_DEBUG = originalApDebug;
+    }
+  });
+
+  test('should include stack trace in debug mode even in production', () => {
+    // Save original values
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalApDebug = process.env.AP_DEBUG;
+    
+    // Set production mode but enable debug
+    process.env.NODE_ENV = 'production';
+    process.env.AP_DEBUG = 'true';
+    
+    const error = new APError('Test message', 'TEST_CODE', 500);
+    const json = error.toJSON();
+    
+    // Stack should be included when AP_DEBUG is true
+    expect(json.stack).toBeDefined();
+    
+    // Restore original values
+    process.env.NODE_ENV = originalNodeEnv;
+    if (originalApDebug !== undefined) {
+      process.env.AP_DEBUG = originalApDebug;
+    } else {
+      delete process.env.AP_DEBUG;
+    }
   });
 });
 
@@ -532,7 +588,12 @@ describe('Error Inheritance and Polymorphism', () => {
       expect(json).toHaveProperty('name');
       expect(json).toHaveProperty('message');
       expect(json).toHaveProperty('code');
-      expect(json).toHaveProperty('stack');
+      
+      // CRITICAL FIX: Stack trace visibility depends on environment
+      if (process.env.NODE_ENV === 'development' || process.env.AP_DEBUG === 'true') {
+        expect(json).toHaveProperty('stack');
+      }
+      
       expect(typeof json.name).toBe('string');
       expect(typeof json.message).toBe('string');
       expect(typeof json.code).toBe('string');

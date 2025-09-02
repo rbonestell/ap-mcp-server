@@ -40,7 +40,8 @@ export class APError extends Error {
   }
 
   toJSON() {
-    return {
+    // CRITICAL FIX: Only include stack traces in development or debug mode to prevent information leakage
+    const json: any = {
       name: this.name,
       message: this.message,
       code: this.code,
@@ -49,8 +50,14 @@ export class APError extends Error {
       suggested_action: this.suggested_action,
       can_retry: this.can_retry,
       alternative_tool: this.alternative_tool,
-      stack: this.stack,
     };
+    
+    // Only include stack traces in development or when debug mode is explicitly enabled
+    if (process.env.NODE_ENV === 'development' || process.env.AP_DEBUG === 'true') {
+      json.stack = this.stack;
+    }
+    
+    return json;
   }
 }
 
