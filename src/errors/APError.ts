@@ -274,7 +274,7 @@ export class ErrorHandler {
                         message.includes('ENOTFOUND') || message.includes('fetch') ||
                         message.includes('Network error') || message.includes('Failed to fetch') ||
                         name === 'AbortError';
-      } catch (checkError) {
+      } catch {
         // If we can't check safely, assume it's not a network error
         isNetworkError = false;
       }
@@ -283,7 +283,7 @@ export class ErrorHandler {
         let errorMessage: string;
         try {
           errorMessage = `Network error: ${error.message}`;
-        } catch (msgError) {
+        } catch {
           errorMessage = 'Network error occurred';
         }
         return new APNetworkError(errorMessage, error);
@@ -308,19 +308,19 @@ export class ErrorHandler {
         } else {
           message = String(error);
         }
-      } catch (messageError) {
+      } catch {
         message = 'Error occurred but message could not be retrieved';
       }
 
       try {
         originalName = (error as any)?.name;
-      } catch (nameError) {
+      } catch {
         originalName = undefined;
       }
 
       try {
         originalStack = (error as any)?.stack;
-      } catch (stackError) {
+      } catch {
         originalStack = undefined;
       }
 
@@ -363,7 +363,7 @@ export class ErrorHandler {
     const statusText = response.statusText;
 
     switch (statusCode) {
-      case 400:
+      case 400: {
         // Check if this is a malformed JSON response first
         const errorMessage = body?.error?.message;
         const errorCode = body?.error?.code;
@@ -416,6 +416,7 @@ export class ErrorHandler {
           errorCode || 'BAD_REQUEST',
           { response: body }
         );
+      }
 
       case 401:
         return new APAuthenticationError(
@@ -435,30 +436,32 @@ export class ErrorHandler {
           body?.error?.message || `Not found: ${statusText}`
         );
 
-      case 429:
+      case 429: {
         let retryAfter: string | null = null;
         try {
           if (response && response.headers && response.headers.get) {
             retryAfter = response.headers.get('retry-after');
           }
-        } catch (headerError) {
+        } catch {
           // Headers access failed, continue without retry-after
         }
         return new APRateLimitError(
           body?.error?.message || `Rate limit exceeded: ${statusText}`,
           retryAfter ? parseInt(retryAfter, 10) : undefined
         );
+      }
 
       case 500:
       case 502:
       case 503:
-      case 504:
+      case 504: {
         return new APAPIError(
           body?.error?.message || `Server error: ${statusText}`,
           statusCode,
           body?.error?.code?.toString() || 'SERVER_ERROR',
           { response: body }
         );
+      }
 
       default:
         return new APAPIError(
