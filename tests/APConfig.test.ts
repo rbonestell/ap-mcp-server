@@ -81,6 +81,71 @@ describe('APConfigManager', () => {
     });
   });
 
+  describe('EnforcePlan Configuration', () => {
+    test('should default to true when AP_ENFORCE_PLAN is not set', () => {
+      setTestEnvVar('AP_API_KEY', 'test-key');
+      clearTestEnvVar('AP_ENFORCE_PLAN');
+      
+      const configManager = new APConfigManager();
+      expect(configManager.get('enforcePlan')).toBe(true);
+    });
+
+    test('should be true when AP_ENFORCE_PLAN is set to "true"', () => {
+      setTestEnvVar('AP_API_KEY', 'test-key');
+      setTestEnvVar('AP_ENFORCE_PLAN', 'true');
+      
+      const configManager = new APConfigManager();
+      expect(configManager.get('enforcePlan')).toBe(true);
+    });
+
+    test('should be false only when AP_ENFORCE_PLAN is exactly "false"', () => {
+      setTestEnvVar('AP_API_KEY', 'test-key');
+      setTestEnvVar('AP_ENFORCE_PLAN', 'false');
+      
+      const configManager = new APConfigManager();
+      expect(configManager.get('enforcePlan')).toBe(false);
+    });
+
+    test('should be true when AP_ENFORCE_PLAN is set to any other value', () => {
+      setTestEnvVar('AP_API_KEY', 'test-key');
+      
+      const testValues = ['1', '0', 'yes', 'no', 'TRUE', 'FALSE', '', ' ', 'anything'];
+      
+      for (const value of testValues) {
+        setTestEnvVar('AP_ENFORCE_PLAN', value);
+        const configManager = new APConfigManager();
+        expect(configManager.get('enforcePlan')).toBe(value !== 'false');
+      }
+    });
+
+    test('should respect override when env var is set to true', () => {
+      setTestEnvVar('AP_API_KEY', 'test-key');
+      setTestEnvVar('AP_ENFORCE_PLAN', 'true');
+      
+      const configManager = new APConfigManager({ enforcePlan: false });
+      expect(configManager.get('enforcePlan')).toBe(false);
+    });
+
+    test('should respect override when env var is set to false', () => {
+      setTestEnvVar('AP_API_KEY', 'test-key');
+      setTestEnvVar('AP_ENFORCE_PLAN', 'false');
+      
+      const configManager = new APConfigManager({ enforcePlan: true });
+      expect(configManager.get('enforcePlan')).toBe(true);
+    });
+
+    test('should include enforcePlan in configuration object', () => {
+      setTestEnvVar('AP_API_KEY', 'test-key');
+      clearTestEnvVar('AP_ENFORCE_PLAN');
+      
+      const configManager = new APConfigManager();
+      const config = configManager.getConfig();
+      
+      expect(config).toHaveProperty('enforcePlan');
+      expect(config.enforcePlan).toBe(true);
+    });
+  });
+
   describe('Configuration Validation', () => {
     describe('API Key Validation', () => {
       test('should throw error when API key is missing', () => {
@@ -326,7 +391,8 @@ describe('APConfigManager', () => {
         timeout: 15000,
         retries: 5,
         hasApiKey: true,
-        apiKeyLength: 'very_secret_api_key'.length
+        apiKeyLength: 'very_secret_api_key'.length,
+        enforcePlan: true
       });
 
       // Should not contain actual API key

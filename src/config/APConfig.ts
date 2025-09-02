@@ -8,6 +8,7 @@ const DEFAULT_CONFIG = {
   baseUrl: 'https://api.ap.org/media/v',
   timeout: 30000, // 30 seconds
   retries: 3,
+  enforcePlan: true, // Default to enforcing plan content only
 } as const;
 
 /**
@@ -44,6 +45,11 @@ export class APConfigManager {
         (process.env.AP_TIMEOUT ? parseInt(process.env.AP_TIMEOUT, 10) : DEFAULT_CONFIG.timeout),
       retries: overrides.retries || 
         (process.env.AP_RETRIES ? parseInt(process.env.AP_RETRIES, 10) : DEFAULT_CONFIG.retries),
+      enforcePlan: overrides.enforcePlan !== undefined 
+        ? overrides.enforcePlan 
+        : (process.env.AP_ENFORCE_PLAN !== undefined 
+          ? process.env.AP_ENFORCE_PLAN !== 'false' 
+          : DEFAULT_CONFIG.enforcePlan),
     };
   }
 
@@ -163,6 +169,7 @@ export class APConfigManager {
       baseUrl: this.config.baseUrl,
       timeout: this.config.timeout,
       retries: this.config.retries,
+      enforcePlan: this.config.enforcePlan,
       hasApiKey: !!this.config.apiKey,
       apiKeyLength: this.config.apiKey?.length || 0,
     };

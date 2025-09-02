@@ -538,6 +538,7 @@ export interface APConfig {
   baseUrl?: string;
   timeout?: number;
   retries?: number;
+  enforcePlan?: boolean; // Force in_my_plan=true for all content requests
 }
 
 /**

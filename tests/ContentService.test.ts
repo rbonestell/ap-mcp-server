@@ -4,6 +4,7 @@
  */
 
 import { APAPIError, APError, APValidationError } from '../src/errors/APError.js';
+import { APConfigManager } from '../src/config/APConfig.js';
 import { APHttpClient } from '../src/http/APHttpClient.js';
 import { ContentService } from '../src/services/ContentService.js';
 import { globalCache } from '../src/utils/Cache.js';
@@ -119,6 +120,102 @@ describe('ContentService', () => {
       expect(thrownError).toBeInstanceOf(APError);
       expect(thrownError.message).toContain('ContentService.searchContent failed');
       expect(thrownError.code).toBe('CONTENT_SERVICE_ERROR');
+    });
+  });
+
+  describe('enforcePlan behavior', () => {
+    // Create a mock feed response for the tests
+    const mockFeedResponse = { data: { items: [] } };
+    
+    test('should enforce in_my_plan=true when enforcePlan is true (default)', async () => {
+      // Create service with default config (enforcePlan=true)
+      const config = new APConfigManager({ apiKey: 'test' });
+      const service = new ContentService(mockHttpClient, config);
+      mockHttpClient.get.mockResolvedValueOnce({ data: mockSearchResponse, status: 200, statusText: 'OK', headers: {} });
+      
+      await service.searchContent({ q: 'test' });
+      
+      expect(mockHttpClient.get).toHaveBeenCalledWith(
+        'content/search',
+        { q: 'test', in_my_plan: true }
+      );
+    });
+
+    test('should override user-provided in_my_plan=false when enforcePlan is true', async () => {
+      // Create service with enforcePlan=true
+      const config = new APConfigManager({ apiKey: 'test', enforcePlan: true });
+      const service = new ContentService(mockHttpClient, config);
+      mockHttpClient.get.mockResolvedValueOnce({ data: mockSearchResponse, status: 200, statusText: 'OK', headers: {} });
+      
+      await service.searchContent({ q: 'test', in_my_plan: false });
+      
+      expect(mockHttpClient.get).toHaveBeenCalledWith(
+        'content/search',
+        { q: 'test', in_my_plan: true }
+      );
+    });
+
+    test('should not enforce in_my_plan when enforcePlan is false', async () => {
+      const config = new APConfigManager({ apiKey: 'test', enforcePlan: false });
+      const service = new ContentService(mockHttpClient, config);
+      mockHttpClient.get.mockResolvedValueOnce({ data: mockSearchResponse, status: 200, statusText: 'OK', headers: {} });
+      
+      await service.searchContent({ q: 'test' });
+      
+      const callArgs = mockHttpClient.get.mock.calls[0][1];
+      expect(callArgs.q).toBe('test');
+      expect(callArgs.in_my_plan).toBeUndefined();
+    });
+
+    test('should respect user-provided in_my_plan when enforcePlan is false', async () => {
+      const config = new APConfigManager({ apiKey: 'test', enforcePlan: false });
+      const service = new ContentService(mockHttpClient, config);
+      mockHttpClient.get.mockResolvedValueOnce({ data: mockSearchResponse, status: 200, statusText: 'OK', headers: {} });
+      
+      await service.searchContent({ q: 'test', in_my_plan: false });
+      
+      expect(mockHttpClient.get).toHaveBeenCalledWith(
+        'content/search',
+        { q: 'test', in_my_plan: false }
+      );
+    });
+
+    test('should enforce on getContentItem when enforcePlan is true', async () => {
+      const config = new APConfigManager({ apiKey: 'test', enforcePlan: true });
+      const service = new ContentService(mockHttpClient, config);
+      mockHttpClient.get.mockResolvedValueOnce({ data: mockContentItem, status: 200, statusText: 'OK', headers: {} });
+      
+      await service.getContentItem('test-item-id');
+      
+      expect(mockHttpClient.get).toHaveBeenCalledWith(
+        'content/test-item-id',
+        { in_my_plan: true }
+      );
+    });
+
+    test('should enforce on getContentFeed when enforcePlan is true', async () => {
+      const config = new APConfigManager({ apiKey: 'test', enforcePlan: true });
+      const service = new ContentService(mockHttpClient, config);
+      mockHttpClient.get.mockResolvedValueOnce({ data: mockFeedResponse, status: 200, statusText: 'OK', headers: {} });
+      
+      await service.getContentFeed({ page_size: 10 });
+      
+      expect(mockHttpClient.get).toHaveBeenCalledWith(
+        'content/feed',
+        { page_size: 10, in_my_plan: true }
+      );
+    });
+
+    test('should not enforce on getContentFeed when enforcePlan is false', async () => {
+      const config = new APConfigManager({ apiKey: 'test', enforcePlan: false });
+      const service = new ContentService(mockHttpClient, config);
+      mockHttpClient.get.mockResolvedValueOnce({ data: mockFeedResponse, status: 200, statusText: 'OK', headers: {} });
+      
+      await service.getContentFeed({ page_size: 10 });
+      
+      const callArgs = mockHttpClient.get.mock.calls[0][1];
+      expect(callArgs.page_size).toBe(10);
+      expect(callArgs.in_my_plan).toBeUndefined();
     });
   });
 

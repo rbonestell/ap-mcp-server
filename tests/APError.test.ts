@@ -48,6 +48,9 @@ describe('APError Base Class', () => {
       code: 'TEST_CODE',
       statusCode: 400,
       details: details,
+      suggested_action: 'Review error details and adjust request',
+      can_retry: false,
+      alternative_tool: undefined,
       stack: error.stack
     });
   });

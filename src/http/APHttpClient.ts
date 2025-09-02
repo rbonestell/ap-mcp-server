@@ -11,6 +11,13 @@ export interface HttpClientOptions {
 }
 
 /**
+ * Request options for cancellation support
+ */
+export interface RequestOptions {
+  signal?: AbortSignal;
+}
+
+/**
  * HTTP response wrapper
  */
 export interface HttpResponse<T = any> {
@@ -18,6 +25,12 @@ export interface HttpResponse<T = any> {
   status: number;
   statusText: string;
   headers: Record<string, string>;
+  rateLimit?: {
+    remaining: number;
+    reset: number;
+    limit: number;
+    retry_after?: number;
+  };
 }
 
 /**
@@ -39,33 +52,119 @@ export class APHttpClient {
   /**
    * Execute a GET request with retry logic
    */
-  async get<T = any>(endpoint: string, params?: Record<string, any>): Promise<HttpResponse<T>> {
+  async get<T = any>(
+    endpoint: string,
+    params?: Record<string, any>,
+    options?: RequestOptions
+  ): Promise<HttpResponse<T>> {
     const url = this.buildUrlWithParams(endpoint, params);
-    return this.executeWithRetry(() => this.executeRequest('GET', url));
+    return this.executeWithRetry(() => this.executeRequest('GET', url, undefined, options?.signal));
   }
 
   /**
    * Execute a POST request with retry logic
    */
-  async post<T = any>(endpoint: string, body?: any, params?: Record<string, any>): Promise<HttpResponse<T>> {
+  async post<T = any>(
+    endpoint: string,
+    body?: any,
+    params?: Record<string, any>,
+    options?: RequestOptions
+  ): Promise<HttpResponse<T>> {
     const url = this.buildUrlWithParams(endpoint, params);
-    return this.executeWithRetry(() => this.executeRequest('POST', url, body));
+    return this.executeWithRetry(() => this.executeRequest('POST', url, body, options?.signal));
   }
 
   /**
    * Execute a PUT request with retry logic
    */
-  async put<T = any>(endpoint: string, body?: any, params?: Record<string, any>): Promise<HttpResponse<T>> {
+  async put<T = any>(
+    endpoint: string,
+    body?: any,
+    params?: Record<string, any>,
+    options?: RequestOptions
+  ): Promise<HttpResponse<T>> {
     const url = this.buildUrlWithParams(endpoint, params);
-    return this.executeWithRetry(() => this.executeRequest('PUT', url, body));
+    return this.executeWithRetry(() => this.executeRequest('PUT', url, body, options?.signal));
   }
 
   /**
    * Execute a DELETE request with retry logic
    */
-  async delete<T = any>(endpoint: string, params?: Record<string, any>): Promise<HttpResponse<T>> {
+  async delete<T = any>(
+    endpoint: string,
+    params?: Record<string, any>,
+    options?: RequestOptions
+  ): Promise<HttpResponse<T>> {
     const url = this.buildUrlWithParams(endpoint, params);
-    return this.executeWithRetry(() => this.executeRequest('DELETE', url));
+    return this.executeWithRetry(() => this.executeRequest('DELETE', url, undefined, options?.signal));
+  }
+
+  /**
+   * Extract rate limit information from response headers
+   */
+  private extractRateLimitInfo(headers: Record<string, string>): HttpResponse['rateLimit'] | undefined {
+    const remaining = headers['x-ratelimit-remaining'] || headers['X-RateLimit-Remaining'];
+    const reset = headers['x-ratelimit-reset'] || headers['X-RateLimit-Reset'];
+    const limit = headers['x-ratelimit-limit'] || headers['X-RateLimit-Limit'];
+    const retryAfter = headers['retry-after'] || headers['Retry-After'];
+
+    if (!remaining && !reset && !limit) {
+      return undefined;
+    }
+
+    const result: {
+      remaining: number;
+      reset: number;
+      limit: number;
+      retry_after?: number;
+    } = {
+      remaining: parseInt(remaining || '100', 10),
+      reset: parseInt(reset || '0', 10),
+      limit: parseInt(limit || '100', 10)
+    };
+
+    if (retryAfter) {
+      result.retry_after = parseInt(retryAfter, 10);
+    }
+
+    return result;
+  }
+
+  /**
+   * Combine multiple abort signals into one
+   * Aborts when any of the provided signals abort
+   */
+  private combineSignals(timeoutSignal: AbortSignal, externalSignal?: AbortSignal): AbortSignal {
+    if (!externalSignal) {
+      return timeoutSignal;
+    }
+
+    const controller = new AbortController();
+
+    // Abort if timeout occurs
+    const handleTimeout = () => {
+      if (!controller.signal.aborted) {
+        controller.abort();
+      }
+    };
+
+    // Abort if external signal aborts
+    const handleExternal = () => {
+      if (!controller.signal.aborted) {
+        controller.abort();
+      }
+    };
+
+    // Set up listeners
+    timeoutSignal.addEventListener('abort', handleTimeout, { once: true });
+    externalSignal.addEventListener('abort', handleExternal, { once: true });
+
+    // Check if either signal is already aborted
+    if (timeoutSignal.aborted || externalSignal.aborted) {
+      controller.abort();
+    }
+
+    return controller.signal;
   }
 
   /**
@@ -93,21 +192,26 @@ export class APHttpClient {
   }
 
   /**
-   * Execute HTTP request with timeout
+   * Execute HTTP request with timeout and cancellation support
    */
   private async executeRequest(
     method: string,
     url: string,
-    body?: any
+    body?: any,
+    externalSignal?: AbortSignal
   ): Promise<HttpResponse> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.options.timeout);
+    // Create a controller for timeout
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), this.options.timeout);
+
+    // Combine external signal with timeout signal
+    const combinedSignal = this.combineSignals(timeoutController.signal, externalSignal);
 
     try {
       const requestInit: RequestInit = {
         method,
         headers: this.config.getHttpHeaders(),
-        signal: controller.signal,
+        signal: combinedSignal,
       };
 
       if (body && (method === 'POST' || method === 'PUT')) {
@@ -126,7 +230,12 @@ export class APHttpClient {
 
       // Check if this is a network error
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new APNetworkError(`Request timeout after ${this.options.timeout}ms`, error);
+        // Check if it was cancelled externally or timed out
+        if (externalSignal?.aborted) {
+          throw new APNetworkError('Request cancelled by client', error);
+        } else {
+          throw new APNetworkError(`Request timeout after ${this.options.timeout}ms`, error);
+        }
       }
 
       // Check if this is an HTTP error thrown from processResponse
@@ -228,12 +337,21 @@ export class APHttpClient {
       throw ErrorHandler.handleHttpError(response, data);
     }
 
-    return {
+    // Extract rate limit information
+    const rateLimit = this.extractRateLimitInfo(headers);
+
+    const result: HttpResponse<T> = {
       data,
       status: response.status,
       statusText: response.statusText,
-      headers,
+      headers
     };
+
+    if (rateLimit) {
+      result.rateLimit = rateLimit;
+    }
+
+    return result;
   }
 
   /**

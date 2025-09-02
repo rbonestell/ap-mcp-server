@@ -1,6 +1,6 @@
 {
 	"name": "ap-mcp-server",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"description": "Model Context Protocol (MCP) server for the Associated Press Media API",
 	"main": "dist/index.js",
 	"bin": {
@@ -50,21 +50,24 @@
 		"node": ">=18.0.0"
 	},
 	"dependencies": {
-		"@modelcontextprotocol/sdk": "^1.17.4"
+		"@modelcontextprotocol/sdk": "^1.17.4",
+		"zod": "^4.1.5"
 	},
 	"devDependencies": {
+		"@stylistic/eslint-plugin": "^5.3.1",
+		"@types/jest": "^30.0.0",
 		"@types/node": "^24.3.0",
 		"@typescript-eslint/eslint-plugin": "^8.41.0",
 		"@typescript-eslint/parser": "^8.41.0",
 		"eslint": "^9.34.0",
 		"eslint-config-prettier": "^10.1.8",
 		"jest": "^30.1.2",
-		"@types/jest": "^30.0.0",
+		"lint-staged": "^16.1.6",
+		"prettier": "^3.6.2",
 		"ts-jest": "^29.4.1",
-		"lint-staged": "^16.1.5",
 		"tsup": "^8.5.0",
 		"typescript": "^5.9.2",
-		"prettier": "^3.6.2"
+		"typescript-eslint": "^8.41.0"
 	},
 	"repository": {
 		"type": "git",

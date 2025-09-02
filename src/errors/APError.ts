@@ -5,6 +5,9 @@ export class APError extends Error {
   public readonly code: string;
   public readonly statusCode: number | undefined;
   public readonly details: Record<string, any> | undefined;
+  public suggested_action?: string;
+  public can_retry?: boolean;
+  public alternative_tool?: string;
 
   constructor(
     message: string,
@@ -18,10 +21,22 @@ export class APError extends Error {
     this.statusCode = statusCode;
     this.details = details;
 
+    // Set recovery hints based on error type
+    this.setRecoveryHints();
+
     // Maintain proper stack trace for where our error was thrown
     if ((Error as any).captureStackTrace) {
       (Error as any).captureStackTrace(this, APError);
     }
+  }
+
+  /**
+   * Set recovery hints based on error code and status
+   */
+  protected setRecoveryHints(): void {
+    // Default hints - subclasses override for specific guidance
+    this.can_retry = false;
+    this.suggested_action = 'Review error details and adjust request';
   }
 
   toJSON() {
@@ -31,6 +46,9 @@ export class APError extends Error {
       code: this.code,
       statusCode: this.statusCode,
       details: this.details,
+      suggested_action: this.suggested_action,
+      can_retry: this.can_retry,
+      alternative_tool: this.alternative_tool,
       stack: this.stack,
     };
   }
@@ -43,6 +61,11 @@ export class APConfigurationError extends APError {
   constructor(message: string, details?: Record<string, any>) {
     super(message, 'CONFIGURATION_ERROR', undefined, details);
     this.name = 'APConfigurationError';
+  }
+
+  protected override setRecoveryHints(): void {
+    this.can_retry = false;
+    this.suggested_action = 'Check AP_API_KEY environment variable and other configuration settings';
   }
 }
 
@@ -62,6 +85,43 @@ export class APAPIError extends APError {
     super(message, code, statusCode, details);
     this.name = 'APAPIError';
     this.originalError = originalError;
+  }
+
+  protected override setRecoveryHints(): void {
+    switch (this.statusCode) {
+      case 400:
+        this.can_retry = false;
+        this.suggested_action = 'Review request parameters and correct invalid values';
+        break;
+      case 401:
+        this.can_retry = false;
+        this.suggested_action = 'Verify API key is valid and properly configured';
+        break;
+      case 403:
+        this.can_retry = false;
+        this.suggested_action = 'Check if content is included in your AP plan';
+        this.alternative_tool = 'search_content with in_my_plan=true';
+        break;
+      case 404:
+        this.can_retry = false;
+        this.suggested_action = 'Verify item ID or try searching for content';
+        this.alternative_tool = 'search_content';
+        break;
+      case 429:
+        this.can_retry = true;
+        this.suggested_action = 'Wait for rate limit reset before retrying (check retry_after header)';
+        break;
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        this.can_retry = true;
+        this.suggested_action = 'AP service issue - retry after a short delay (30-60 seconds)';
+        break;
+      default:
+        this.can_retry = false;
+        this.suggested_action = 'Review API documentation for this error code';
+    }
   }
 
   static fromAPResponse(response: any, statusCode: number): APAPIError {
@@ -93,6 +153,19 @@ export class APNetworkError extends APError {
     this.name = 'APNetworkError';
     this.originalError = originalError;
   }
+
+  protected override setRecoveryHints(): void {
+    this.can_retry = true;
+
+    if (this.message.includes('timeout')) {
+      this.suggested_action = 'Request timed out - retry with longer timeout or smaller page_size';
+    } else if (this.message.includes('cancelled')) {
+      this.suggested_action = 'Request was cancelled - retry if needed';
+      this.can_retry = false;
+    } else {
+      this.suggested_action = 'Network issue - check connection and retry';
+    }
+  }
 }
 
 /**
@@ -106,6 +179,18 @@ export class APValidationError extends APError {
     });
     this.name = 'APValidationError';
   }
+
+  protected override setRecoveryHints(): void {
+    this.can_retry = false;
+    this.suggested_action = `Fix validation error in field '${this.details?.field}' and retry`;
+
+    // Provide specific hints based on field
+    if (this.details?.field === 'page_size') {
+      this.suggested_action = 'Adjust page_size to be between 1 and 100';
+    } else if (this.details?.field === 'item_ids') {
+      this.suggested_action = 'Ensure item_ids array has 1-50 valid IDs';
+    }
+  }
 }
 
 /**
@@ -115,6 +200,11 @@ export class APAuthenticationError extends APError {
   constructor(message: string = 'Authentication failed') {
     super(message, 'AUTHENTICATION_ERROR', 401);
     this.name = 'APAuthenticationError';
+  }
+
+  protected override setRecoveryHints(): void {
+    this.can_retry = false;
+    this.suggested_action = 'Verify AP_API_KEY is valid and has not expired';
   }
 }
 
@@ -129,6 +219,15 @@ export class APRateLimitError extends APError {
     this.name = 'APRateLimitError';
     this.retryAfter = retryAfter;
   }
+
+  protected override setRecoveryHints(): void {
+    this.can_retry = true;
+    if (this.retryAfter) {
+      this.suggested_action = `Rate limit exceeded - wait ${this.retryAfter} seconds before retrying`;
+    } else {
+      this.suggested_action = 'Rate limit exceeded - wait before retrying or reduce request frequency';
+    }
+  }
 }
 
 /**
@@ -138,6 +237,12 @@ export class APNotFoundError extends APError {
   constructor(message: string, resource?: string) {
     super(message, 'NOT_FOUND_ERROR', 404, { resource });
     this.name = 'APNotFoundError';
+  }
+
+  protected override setRecoveryHints(): void {
+    this.can_retry = false;
+    this.suggested_action = `Resource '${this.details?.resource}' not found - verify ID or use search_content`;
+    this.alternative_tool = 'search_content';
   }
 }
 
@@ -165,7 +270,7 @@ export class ErrorHandler {
       try {
         const message = error.message || '';
         const name = error.name || '';
-        isNetworkError = message.includes('timeout') || message.includes('ECONNREFUSED') || 
+        isNetworkError = message.includes('timeout') || message.includes('ECONNREFUSED') ||
                         message.includes('ENOTFOUND') || message.includes('fetch') ||
                         message.includes('Network error') || message.includes('Failed to fetch') ||
                         name === 'AbortError';
@@ -173,7 +278,7 @@ export class ErrorHandler {
         // If we can't check safely, assume it's not a network error
         isNetworkError = false;
       }
-      
+
       if (isNetworkError) {
         let errorMessage: string;
         try {
@@ -188,7 +293,7 @@ export class ErrorHandler {
       let message: string;
       let originalName: string | undefined;
       let originalStack: string | undefined;
-      
+
       try {
         // For Jest mock objects or other safe Error objects, try direct access first
         if (error && typeof error === 'object' && 'message' in error) {
@@ -206,20 +311,20 @@ export class ErrorHandler {
       } catch (messageError) {
         message = 'Error occurred but message could not be retrieved';
       }
-      
+
       try {
         originalName = (error as any)?.name;
       } catch (nameError) {
         originalName = undefined;
       }
-      
+
       try {
         originalStack = (error as any)?.stack;
       } catch (stackError) {
         originalStack = undefined;
       }
-      
-      // More lenient check - only trigger corruption detection for actual corruption indicators  
+
+      // More lenient check - only trigger corruption detection for actual corruption indicators
       if (!message || message.length === 0) {
         message = 'Error occurred with empty message';
       } else if (message.includes('Cannot read properties of undefined') || message.includes('Cannot read property')) {
@@ -230,7 +335,7 @@ export class ErrorHandler {
           message = 'Error occurred (details unavailable due to error object corruption)';
         }
       }
-      
+
       return new APError(message, 'UNKNOWN_ERROR', undefined, {
         originalName,
         originalStack,
@@ -253,7 +358,7 @@ export class ErrorHandler {
     if (!response) {
       return new APError('HTTP error with invalid response', 'HTTP_ERROR', undefined, { body });
     }
-    
+
     const statusCode = response.status;
     const statusText = response.statusText;
 
@@ -262,18 +367,18 @@ export class ErrorHandler {
         // Check if this is a malformed JSON response first
         const errorMessage = body?.error?.message;
         const errorCode = body?.error?.code;
-        
+
         // Check for malformed JSON indicators
         const isInvalidJson = errorMessage && (
-          errorMessage.includes('Malformed JSON response') || 
+          errorMessage.includes('Malformed JSON response') ||
           errorMessage.includes('invalid json') ||
           errorMessage.includes('JSON') ||
           errorMessage.includes('unexpected token') ||
           errorMessage.includes('Unexpected token')
         );
-        
+
         const message = errorMessage || `Bad Request: ${statusText}`;
-        
+
         if (isInvalidJson) {
           return new APAPIError(
             message,
@@ -282,28 +387,28 @@ export class ErrorHandler {
             { response: body }
           );
         }
-        
+
         // Check if this looks like a parameter validation error (common AP API pattern)
-        const isValidationError = errorCode === 'INVALID_PARAMETER' || 
+        const isValidationError = errorCode === 'INVALID_PARAMETER' ||
                                   errorCode === 'VALIDATION_ERROR' ||
                                   errorMessage?.includes('parameter') ||
                                   errorMessage?.includes('required') ||
                                   errorMessage?.includes('invalid') ||
                                   errorMessage?.includes('missing');
-        
+
         if (isValidationError) {
           // Extract field name if available
-          const field = body?.error?.details?.parameter || 
+          const field = body?.error?.details?.parameter ||
                        body?.error?.details?.field ||
                        undefined;
-          
+
           return new APValidationError(
             message,
             field,
             { response: body }
           );
         }
-        
+
         // Otherwise, treat as generic API error
         return new APAPIError(
           message,
@@ -311,12 +416,12 @@ export class ErrorHandler {
           errorCode || 'BAD_REQUEST',
           { response: body }
         );
-      
+
       case 401:
         return new APAuthenticationError(
           body?.error?.message || `Authentication failed: ${statusText}`
         );
-      
+
       case 403:
         return new APError(
           body?.error?.message || `Forbidden: ${statusText}`,
@@ -324,12 +429,12 @@ export class ErrorHandler {
           403,
           { response: body }
         );
-      
+
       case 404:
         return new APNotFoundError(
           body?.error?.message || `Not found: ${statusText}`
         );
-      
+
       case 429:
         let retryAfter: string | null = null;
         try {
@@ -343,7 +448,7 @@ export class ErrorHandler {
           body?.error?.message || `Rate limit exceeded: ${statusText}`,
           retryAfter ? parseInt(retryAfter, 10) : undefined
         );
-      
+
       case 500:
       case 502:
       case 503:
@@ -354,7 +459,7 @@ export class ErrorHandler {
           body?.error?.code?.toString() || 'SERVER_ERROR',
           { response: body }
         );
-      
+
       default:
         return new APAPIError(
           body?.error?.message || `HTTP ${statusCode}: ${statusText}`,
