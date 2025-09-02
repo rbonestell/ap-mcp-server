@@ -9,6 +9,7 @@ import { ConnectionPool } from '../http/ConnectionPool.js';
 import { AccountService } from '../services/AccountService.js';
 import { ContentService } from '../services/ContentService.js';
 import { MonitoringService } from '../services/MonitoringService.js';
+import { registerAPPrompts } from '../prompts/APPrompts.js';
 
 // Define Zod schemas for all tools
 const SearchContentSchema = z.object({
@@ -246,6 +247,14 @@ export class APMCPServer {
     });
 
     this.setupTools();
+    this.setupPrompts();
+  }
+
+  /**
+   * Setup all MCP prompts for simplified usage
+   */
+  private setupPrompts(): void {
+    registerAPPrompts(this.server, this.contentService, this.monitoringService);
   }
 
   /**
@@ -641,7 +650,7 @@ export class APMCPServer {
       },
       async (params) => {
         try {
-          const result = await this.contentService.getOndemandContent(params);
+          const result = await this.contentService.getOnDemandContent(params);
           return {
             content: [{
               type: 'text',
@@ -664,7 +673,7 @@ export class APMCPServer {
       },
       async (params) => {
         try {
-          const result = await this.contentService.buildSearchQuery(params);
+          const result = await ContentService.buildSearchQuery(params);
           return {
             content: [{
               type: 'text',

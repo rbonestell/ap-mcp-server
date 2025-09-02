@@ -20,6 +20,7 @@ An _**unofficial**_ Model Context Protocol (MCP) server that transforms the Asso
 ### 🤖 Conversational AI Features
 
 - **Natural Language Query Processing**: Convert conversational queries into optimized AP API searches
+- **Intelligent Prompt Templates**: 17 pre-configured prompts for common workflows and use cases
 - **Intelligent Content Recommendations**: AI-powered content discovery and related article suggestions
 - **Trend Analysis**: Real-time trending topic detection and analysis
 - **Smart Query Optimization**: Automatic query enhancement for better search results
@@ -162,6 +163,103 @@ AI tools automatically convert these requests into the appropriate MCP tool call
 | `AP_CACHE_ENABLED`    | 🚫       | `true`                       | Enable intelligent caching system                                    |
 | `AP_CACHE_TTL_TRENDS` | 🚫       | `300000`                     | Trending topics cache TTL (5 minutes)                                |
 | `AP_CACHE_TTL_SEARCH` | 🚫       | `180000`                     | Search results cache TTL (3 minutes)                                 |
+
+## 🎯 MCP Prompts (17 Available)
+
+The AP MCP Server now includes intelligent prompt templates that simplify complex operations and optimize API usage. These prompts abstract away parameter complexity and provide natural language interfaces for common workflows.
+
+### 🔍 Search & Discovery Prompts
+
+#### `breaking-news-search`
+Search for the latest breaking news with optimized parameters.
+- **Arguments**: `topic`, `hours_ago`, `location`, `max_results`
+- **Example**: "Get breaking news about technology from the last 2 hours"
+
+#### `topic-deep-dive`
+Comprehensive research on a specific topic with in-depth coverage.
+- **Arguments**: `topic`, `days_back`, `min_word_count`, `include_analysis`, `max_results`
+- **Example**: "Deep dive into climate change coverage from the past week"
+
+#### `multimedia-search`
+Find photos, videos, graphics, and audio content.
+- **Arguments**: `topic`, `media_type`, `days_back`, `high_quality_only`, `max_results`
+- **Example**: "Find high-quality photos of the Olympics from the last 7 days"
+
+#### `regional-coverage`
+Get comprehensive news coverage for specific regions or locations.
+- **Arguments**: `location`, `include_national`, `include_local`, `days_back`, `max_results`
+- **Example**: "Get all news from California including national and local stories"
+
+#### `smart-search`
+Intelligently search with natural language queries and auto-expansion.
+- **Arguments**: `query`, `search_mode`, `auto_expand`
+- **Example**: "Smart search for renewable energy innovations"
+
+### 📊 Analysis & Insights Prompts
+
+#### `trend-analysis`
+Analyze trending topics and patterns in news coverage.
+- **Arguments**: `category`, `timeframe`, `location_filter`, `include_sentiment`, `max_topics`
+- **Example**: "Analyze technology trends from the past day"
+
+#### `content-recommendations`
+Get AI-powered content recommendations based on topics or past content.
+- **Arguments**: `based_on`, `subjects`, `content_types`, `location_preference`, `max_recommendations`
+- **Example**: "Get recommendations based on artificial intelligence topics"
+
+#### `coverage-comparison`
+Compare news coverage across different time periods.
+- **Arguments**: `topic`, `period1_days_ago`, `period2_days_ago`, `period_length_days`, `metrics`
+- **Example**: "Compare election coverage between last week and this week"
+
+#### `quick-trending`
+Get a quick snapshot of what's trending right now.
+- **Arguments**: `max_topics`
+- **Example**: "Show me the top 10 trending topics"
+
+### 🔔 Monitoring & Alert Prompts
+
+#### `create-news-monitor`
+Set up automated monitoring for specific news topics.
+- **Arguments**: `topic`, `monitor_name`, `email`, `alert_frequency`, `description`
+- **Example**: "Monitor breaking news about climate change every 30 minutes"
+
+#### `breaking-alert-setup`
+Quick setup for urgent breaking news alerts.
+- **Arguments**: `topics`, `email`, `sensitivity`
+- **Example**: "Set up high-sensitivity alerts for earthquake and tsunami news"
+
+#### `list-monitors`
+View all active content monitors and their status.
+- **Arguments**: `include_status`, `include_history`
+- **Example**: "List all my active monitors with their current status"
+
+#### `manage-monitor`
+Update or delete existing monitors.
+- **Arguments**: `monitor_id`, `action`, `new_email`, `new_frequency`
+- **Example**: "Update my climate monitor to check every 10 minutes"
+
+### 📰 Workflow Prompts
+
+#### `daily-news-briefing`
+Generate a comprehensive daily news briefing.
+- **Arguments**: `categories`, `location`, `include_breaking`, `include_trending`, `include_recommendations`
+- **Example**: "Create a daily briefing focused on technology and business"
+
+#### `research-workflow`
+Comprehensive research workflow for investigating topics.
+- **Arguments**: `topic`, `depth`, `time_range_days`, `include_multimedia`, `include_analysis`
+- **Example**: "Deep research on renewable energy over the past 30 days"
+
+#### `content-curation`
+Curate content for specific audiences or purposes.
+- **Arguments**: `audience`, `topics`, `content_mix`, `total_items`
+- **Example**: "Curate 20 items for a business audience about AI and automation"
+
+#### `story-development`
+Assist in developing stories with background and context.
+- **Arguments**: `story_topic`, `story_type`, `needs`
+- **Example**: "Help develop a feature story about urban farming with background and expert sources"
 
 ## 🛠️ Available Tools (26 Total)
 
