@@ -39,6 +39,7 @@ export interface HttpResponse<T = any> {
 export class APHttpClient {
   private readonly config: APConfigManager;
   private readonly options: Required<HttpClientOptions>;
+  private activeRequests: Set<AbortController> = new Set();
 
   constructor(config: APConfigManager, options: HttpClientOptions = {}) {
     this.config = config;
@@ -204,6 +205,9 @@ export class APHttpClient {
     const timeoutController = new AbortController();
     const timeoutId = setTimeout(() => timeoutController.abort(), this.options.timeout);
 
+    // Track this request
+    this.activeRequests.add(timeoutController);
+
     // Combine external signal with timeout signal
     const combinedSignal = this.combineSignals(timeoutController.signal, externalSignal);
 
@@ -222,11 +226,12 @@ export class APHttpClient {
 
       // Clear timeout since request completed
       clearTimeout(timeoutId);
-
+      this.activeRequests.delete(timeoutController);
 
       return await this.processResponse(response);
     } catch (error) {
       clearTimeout(timeoutId);
+      this.activeRequests.delete(timeoutController);
 
       // Check if this is a network error
       if (error instanceof Error && error.name === 'AbortError') {
@@ -461,5 +466,23 @@ export class APHttpClient {
       }
       throw error;
     }
+  }
+
+  /**
+   * Cleanup method for connection pool management
+   * Cancels any in-flight requests and cleans up resources
+   */
+  cleanup(): void {
+    // Abort any active requests
+    for (const controller of this.activeRequests) {
+      try {
+        controller.abort();
+      } catch (error) {
+        // Ignore errors during cleanup
+      }
+    }
+    
+    // Clear the active requests set
+    this.activeRequests.clear();
   }
 }
