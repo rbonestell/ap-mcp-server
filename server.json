@@ -1,0 +1,31 @@
+{
+	"$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+	"name": "io.github.rbonestell/ap-mcp-server",
+	"description": "Model Context Protocol (MCP) server for the Associated Press Media API",
+	"status": "active",
+	"repository": {
+		"url": "https://github.com/rbonestell/ap-mcp-server",
+		"source": "github"
+	},
+	"version": "1.2.6",
+	"packages": [
+		{
+			"registry_type": "npm",
+			"registry_base_url": "https://registry.npmjs.org",
+			"identifier": "ap-mcp-server",
+			"version": "1.2.6",
+			"transport": {
+				"type": "stdio"
+			},
+			"environment_variables": [
+				{
+					"description": "Your API key for the service",
+					"is_required": true,
+					"format": "string",
+					"is_secret": true,
+					"name": "YOUR_API_KEY"
+				}
+			]
+		}
+	]
+}

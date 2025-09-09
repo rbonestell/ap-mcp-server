@@ -80,3 +80,7 @@ temp/
 
 # Jest cache
 .jest/
+
+# MCP Registry
+.mcpregistry_github_token
+.mcpregistry_registry_token
